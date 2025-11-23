@@ -110,20 +110,29 @@ class AIService {
           throw new Error('Failed to check task status');
         }
 
-        const status = statusData.data?.status;
-        console.log(`Task ${taskId} status: ${status} (attempt ${attempt + 1}/${maxAttempts})`);
+        // NanoBanana uses 'successFlag' not 'status'
+        const successFlag = statusData.data?.successFlag;
+        console.log(`Task ${taskId} successFlag: ${successFlag} (attempt ${attempt + 1}/${maxAttempts})`);
 
-        if (status === 1) { // SUCCESS
-          const imageUrls = statusData.data?.imageUrls;
-          if (imageUrls && imageUrls.length > 0) {
-            console.log('NanoBanana generation completed successfully');
-            return imageUrls[0];
+        if (successFlag === 1) { // SUCCESS
+          const response = statusData.data?.response;
+          if (response) {
+            try {
+              const responseData = JSON.parse(response);
+              if (responseData.imageUrls && responseData.imageUrls.length > 0) {
+                console.log('NanoBanana generation completed successfully');
+                return responseData.imageUrls[0];
+              }
+            } catch (e) {
+              console.error('Failed to parse response:', e);
+            }
           }
           throw new Error('No image URL in response');
-        } else if (status === 2 || status === 3) { // FAILED
-          throw new Error('Generation failed');
+        } else if (successFlag === 2 || successFlag === 3) { // FAILED
+          const errorMessage = statusData.data?.errorMessage || 'Generation failed';
+          throw new Error(`Generation failed: ${errorMessage}`);
         }
-        // status === 0 means still generating, continue polling
+        // successFlag === 0 means still generating, continue polling
       } catch (error) {
         if (attempt === maxAttempts - 1) {
           throw error;
