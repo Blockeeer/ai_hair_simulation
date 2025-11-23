@@ -37,10 +37,10 @@ class AIService {
     try {
       const prompt = `Transform this person's hairstyle to: ${haircutDescription}. Keep the person's face and other features unchanged. Only modify the hair to match the description.`;
 
-      // Save image locally and serve via deployed URL
-      console.log('Saving image for public access...');
-      const imageUrl = await this.saveImageLocally(imageBase64);
-      console.log('Image URL:', imageUrl);
+      // Upload image to public hosting (Telegraph)
+      console.log('Uploading image to public hosting...');
+      const imageUrl = await this.uploadToPublicHost(imageBase64);
+      console.log('Public Image URL:', imageUrl);
 
       console.log('Request payload:', {
         prompt,
