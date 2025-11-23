@@ -144,13 +144,149 @@ class AIService {
   }
 
   /**
-   * Upload to public hosting (Telegraph/Telegra.ph)
+   * Upload to public hosting with multiple fallbacks
    */
   async uploadToPublicHost(imageBase64) {
+    // Try multiple services in order
+    const services = [
+      () => this.uploadToPostimages(imageBase64),
+      () => this.uploadToCloudinaryFree(imageBase64),
+      () => this.uploadToImgBB(imageBase64),
+      () => this.uploadToTelegraph(imageBase64)
+    ];
+
+    for (let i = 0; i < services.length; i++) {
+      try {
+        console.log(`Trying upload service ${i + 1}/${services.length}...`);
+        const url = await services[i]();
+        console.log('Upload successful:', url);
+        return url;
+      } catch (error) {
+        console.error(`Service ${i + 1} failed:`, error.message);
+        if (i === services.length - 1) {
+          throw new Error('All image upload services failed');
+        }
+      }
+    }
+  }
+
+  /**
+   * Upload to Postimages (Free, no API key needed)
+   */
+  async uploadToPostimages(imageBase64) {
     try {
       const FormData = require('form-data');
 
-      // Convert base64 to buffer
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith('data:')) {
+        cleanBase64 = imageBase64.split(',')[1];
+      }
+
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      const formData = new FormData();
+      formData.append('upload', buffer, {
+        filename: 'hair.jpg',
+        contentType: 'image/jpeg'
+      });
+      formData.append('optsize', '0');
+      formData.append('expire', '0');
+
+      console.log('Uploading to Postimages...');
+      const response = await fetch('https://postimages.org/json/rr', {
+        method: 'POST',
+        body: formData,
+        headers: formData.getHeaders()
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.url) {
+        console.log('Postimages upload successful');
+        return data.url;
+      } else {
+        throw new Error('Postimages upload failed');
+      }
+    } catch (error) {
+      throw new Error('Postimages upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to Cloudinary (Free tier, most reliable)
+   */
+  async uploadToCloudinaryFree(imageBase64) {
+    try {
+      const cloudinary = require('cloudinary').v2;
+
+      // Free Cloudinary credentials (demo account - get your own at cloudinary.com)
+      cloudinary.config({
+        cloud_name: 'demo',
+        api_key: '111111111111111',
+        api_secret: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      });
+
+      console.log('Uploading to Cloudinary...');
+
+      const result = await cloudinary.uploader.upload(imageBase64, {
+        folder: 'hair_simulation',
+        resource_type: 'image'
+      });
+
+      if (result && result.secure_url) {
+        console.log('Cloudinary upload successful');
+        return result.secure_url;
+      } else {
+        throw new Error('Cloudinary upload failed: No URL returned');
+      }
+    } catch (error) {
+      throw new Error('Cloudinary upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to ImgBB (Free, reliable)
+   */
+  async uploadToImgBB(imageBase64) {
+    try {
+      // Convert base64 to clean format
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith('data:')) {
+        cleanBase64 = imageBase64.split(',')[1];
+      }
+
+      // ImgBB free API key (public, you can get your own at imgbb.com)
+      const apiKey = '6d207e02198a847aa98d0a2a901485a5';
+
+      const formData = new URLSearchParams();
+      formData.append('image', cleanBase64);
+
+      console.log('Uploading to ImgBB...');
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data && data.data.url) {
+        console.log('ImgBB upload successful');
+        return data.data.url;
+      } else {
+        throw new Error(`ImgBB upload failed: ${data.error?.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      throw new Error('ImgBB upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to Telegraph/Telegra.ph
+   */
+  async uploadToTelegraph(imageBase64) {
+    try {
+      const FormData = require('form-data');
+
       let cleanBase64 = imageBase64;
       if (imageBase64.startsWith('data:')) {
         cleanBase64 = imageBase64.split(',')[1];
@@ -171,18 +307,53 @@ class AIService {
       });
 
       const data = await response.json();
-      console.log('Telegraph response:', JSON.stringify(data, null, 2));
 
       if (data && data[0] && data[0].src) {
         const imageUrl = `https://telegra.ph${data[0].src}`;
-        console.log('Image uploaded successfully to:', imageUrl);
         return imageUrl;
       } else {
-        throw new Error(`Telegraph upload failed: ${JSON.stringify(data)}`);
+        throw new Error('Telegraph upload failed');
       }
     } catch (error) {
-      console.error('Telegraph upload error:', error);
-      throw new Error('Failed to upload image: ' + error.message);
+      throw new Error('Telegraph upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to file.io (temporary hosting)
+   */
+  async uploadToFileIO(imageBase64) {
+    try {
+      const FormData = require('form-data');
+
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith('data:')) {
+        cleanBase64 = imageBase64.split(',')[1];
+      }
+
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      const formData = new FormData();
+      formData.append('file', buffer, {
+        filename: 'haircut.jpg',
+        contentType: 'image/jpeg'
+      });
+
+      console.log('Uploading to file.io...');
+      const response = await fetch('https://file.io/?expires=1d', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.link) {
+        return data.link;
+      } else {
+        throw new Error('File.io upload failed');
+      }
+    } catch (error) {
+      throw new Error('File.io upload failed: ' + error.message);
     }
   }
 
