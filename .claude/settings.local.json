@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill //F //PID 15064)",
+      "Bash(taskkill //F //PID 9176)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill //F //PID 18256)",
+      "Bash(server/src/app.js)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
