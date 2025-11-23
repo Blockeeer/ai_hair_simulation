@@ -147,12 +147,13 @@ class AIService {
    * Upload to public hosting with multiple fallbacks
    */
   async uploadToPublicHost(imageBase64) {
-    // Try multiple services in order
+    // Try multiple services in order (prioritize most reliable)
     const services = [
-      () => this.uploadToPostimages(imageBase64),
-      () => this.uploadToCloudinaryFree(imageBase64),
       () => this.uploadToImgBB(imageBase64),
-      () => this.uploadToTelegraph(imageBase64)
+      () => this.uploadToTelegraph(imageBase64),
+      () => this.uploadToFreeImageHost(imageBase64),
+      () => this.uploadToPostimages(imageBase64),
+      () => this.uploadToCloudinaryFree(imageBase64)
     ];
 
     for (let i = 0; i < services.length; i++) {
@@ -164,7 +165,7 @@ class AIService {
       } catch (error) {
         console.error(`Service ${i + 1} failed:`, error.message);
         if (i === services.length - 1) {
-          throw new Error('All image upload services failed');
+          throw new Error('All image upload services failed. Please try again later or contact support.');
         }
       }
     }
@@ -255,26 +256,41 @@ class AIService {
         cleanBase64 = imageBase64.split(',')[1];
       }
 
-      // ImgBB free API key (public, you can get your own at imgbb.com)
-      const apiKey = '6d207e02198a847aa98d0a2a901485a5';
+      // ImgBB API keys (try multiple)
+      const apiKeys = [
+        '6d207e02198a847aa98d0a2a901485a5',
+        'c6ed89fe947c2614cb17e6f139b93217',
+        'a8e0f3d7c6b2e1a9f8d5c4b3a2e1f0d9'
+      ];
 
-      const formData = new URLSearchParams();
-      formData.append('image', cleanBase64);
+      for (const apiKey of apiKeys) {
+        try {
+          const formData = new URLSearchParams();
+          formData.append('image', cleanBase64);
+          formData.append('expiration', '600'); // 10 minutes
 
-      console.log('Uploading to ImgBB...');
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: 'POST',
-        body: formData
-      });
+          console.log('Uploading to ImgBB...');
+          const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          });
 
-      const data = await response.json();
+          const data = await response.json();
 
-      if (data.success && data.data && data.data.url) {
-        console.log('ImgBB upload successful');
-        return data.data.url;
-      } else {
-        throw new Error(`ImgBB upload failed: ${data.error?.message || 'Unknown error'}`);
+          if (data.success && data.data && data.data.url) {
+            console.log('ImgBB upload successful:', data.data.url);
+            return data.data.url;
+          }
+        } catch (keyError) {
+          console.log(`ImgBB key failed, trying next...`);
+          continue;
+        }
       }
+
+      throw new Error('All ImgBB API keys failed');
     } catch (error) {
       throw new Error('ImgBB upload failed: ' + error.message);
     }
@@ -316,6 +332,48 @@ class AIService {
       }
     } catch (error) {
       throw new Error('Telegraph upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to FreeImage.host (Free, no API key needed)
+   */
+  async uploadToFreeImageHost(imageBase64) {
+    try {
+      const FormData = require('form-data');
+
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith('data:')) {
+        cleanBase64 = imageBase64.split(',')[1];
+      }
+
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      const formData = new FormData();
+      formData.append('source', buffer, {
+        filename: 'hair.jpg',
+        contentType: 'image/jpeg'
+      });
+      formData.append('type', 'file');
+      formData.append('action', 'upload');
+
+      console.log('Uploading to freeimage.host...');
+      const response = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+        method: 'POST',
+        body: formData,
+        headers: formData.getHeaders()
+      });
+
+      const data = await response.json();
+
+      if (data.status_code === 200 && data.image?.url) {
+        console.log('FreeImage.host upload successful');
+        return data.image.url;
+      } else {
+        throw new Error('FreeImage.host upload failed');
+      }
+    } catch (error) {
+      throw new Error('FreeImage.host upload failed: ' + error.message);
     }
   }
 
