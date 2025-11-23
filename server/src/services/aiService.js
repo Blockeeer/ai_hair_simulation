@@ -149,23 +149,30 @@ class AIService {
   async uploadToPublicHost(imageBase64) {
     // Try multiple services in order (prioritize most reliable)
     const services = [
-      () => this.uploadToImgBB(imageBase64),
-      () => this.uploadToTelegraph(imageBase64),
-      () => this.uploadToFreeImageHost(imageBase64),
-      () => this.uploadToPostimages(imageBase64),
-      () => this.uploadToCloudinaryFree(imageBase64)
+      { name: 'ImgBB', fn: () => this.uploadToImgBB(imageBase64) },
+      { name: 'ImgBox', fn: () => this.uploadToImgBox(imageBase64) },
+      { name: 'Telegraph', fn: () => this.uploadToTelegraph(imageBase64) },
+      { name: 'Catbox', fn: () => this.uploadToCatbox(imageBase64) },
+      { name: 'FreeImageHost', fn: () => this.uploadToFreeImageHost(imageBase64) },
+      { name: 'Postimages', fn: () => this.uploadToPostimages(imageBase64) }
     ];
+
+    const errors = [];
 
     for (let i = 0; i < services.length; i++) {
       try {
-        console.log(`Trying upload service ${i + 1}/${services.length}...`);
-        const url = await services[i]();
-        console.log('Upload successful:', url);
+        console.log(`[${i + 1}/${services.length}] Trying ${services[i].name}...`);
+        const url = await services[i].fn();
+        console.log(`✓ ${services[i].name} upload successful:`, url);
         return url;
       } catch (error) {
-        console.error(`Service ${i + 1} failed:`, error.message);
+        const errorMsg = `${services[i].name}: ${error.message}`;
+        console.error(`✗ ${errorMsg}`);
+        errors.push(errorMsg);
+
         if (i === services.length - 1) {
-          throw new Error('All image upload services failed. Please try again later or contact support.');
+          console.error('All image upload services failed:', errors);
+          throw new Error(`All ${services.length} image upload services failed. Errors: ${errors.join(' | ')}`);
         }
       }
     }
@@ -374,6 +381,90 @@ class AIService {
       }
     } catch (error) {
       throw new Error('FreeImage.host upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to ImgBox (Free, no API key needed)
+   */
+  async uploadToImgBox(imageBase64) {
+    try {
+      const FormData = require('form-data');
+
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith('data:')) {
+        cleanBase64 = imageBase64.split(',')[1];
+      }
+
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      const formData = new FormData();
+      formData.append('files[]', buffer, {
+        filename: 'hair.jpg',
+        contentType: 'image/jpeg'
+      });
+
+      console.log('Uploading to imgbox.com...');
+      const response = await fetch('https://imgbox.com/upload/process', {
+        method: 'POST',
+        body: formData,
+        headers: formData.getHeaders()
+      });
+
+      const text = await response.text();
+
+      // ImgBox returns HTML, extract the direct image URL
+      const urlMatch = text.match(/https?:\/\/images\d*\.imgbox\.com\/[a-zA-Z0-9\/\._-]+\.(jpg|jpeg|png|gif)/i);
+
+      if (urlMatch && urlMatch[0]) {
+        console.log('ImgBox upload successful');
+        return urlMatch[0];
+      } else {
+        throw new Error('ImgBox: Could not extract image URL from response');
+      }
+    } catch (error) {
+      throw new Error('ImgBox upload failed: ' + error.message);
+    }
+  }
+
+  /**
+   * Upload to Catbox (Free, reliable, no API key)
+   */
+  async uploadToCatbox(imageBase64) {
+    try {
+      const FormData = require('form-data');
+
+      let cleanBase64 = imageBase64;
+      if (imageBase64.startsWith('data:')) {
+        cleanBase64 = imageBase64.split(',')[1];
+      }
+
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      const formData = new FormData();
+      formData.append('reqtype', 'fileupload');
+      formData.append('fileToUpload', buffer, {
+        filename: 'hair.jpg',
+        contentType: 'image/jpeg'
+      });
+
+      console.log('Uploading to catbox.moe...');
+      const response = await fetch('https://catbox.moe/user/api.php', {
+        method: 'POST',
+        body: formData,
+        headers: formData.getHeaders()
+      });
+
+      const url = await response.text();
+
+      if (url && url.startsWith('https://files.catbox.moe/')) {
+        console.log('Catbox upload successful');
+        return url.trim();
+      } else {
+        throw new Error('Catbox: Invalid response - ' + url);
+      }
+    } catch (error) {
+      throw new Error('Catbox upload failed: ' + error.message);
     }
   }
 
