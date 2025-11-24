@@ -1,11 +1,6 @@
-import Replicate from 'replicate';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const Replicate = require('replicate');
+const fs = require('fs').promises;
+const path = require('path');
 
 class AIService {
   constructor() {
@@ -25,9 +20,11 @@ class AIService {
   /**
    * Main method to change haircut using Replicate API
    */
-  async changeHaircut(imageBase64, haircutDescription) {
+  async changeHaircut(imageBase64, options = {}) {
+    const { haircut = 'Random', hair_color = 'Random', gender = 'Auto-detect' } = options;
+
     console.log('Starting haircut generation with Replicate...');
-    console.log('Haircut description:', haircutDescription);
+    console.log('Options:', { haircut, hair_color, gender });
 
     // Check if Replicate API is configured
     if (!this.replicateApiToken || this.replicateApiToken === 'your_replicate_api_token_here') {
@@ -35,7 +32,7 @@ class AIService {
     }
 
     try {
-      const result = await this.replicateChangeHaircut(imageBase64, haircutDescription);
+      const result = await this.replicateChangeHaircut(imageBase64, { haircut, hair_color, gender });
       return result;
     } catch (error) {
       console.error('Replicate API error:', error);
@@ -46,7 +43,7 @@ class AIService {
   /**
    * Replicate API implementation using flux-kontext-apps/change-haircut
    */
-  async replicateChangeHaircut(imageBase64, haircutDescription) {
+  async replicateChangeHaircut(imageBase64, options) {
     try {
       // Ensure base64 has data URI prefix
       let base64DataUri = imageBase64;
@@ -56,11 +53,11 @@ class AIService {
 
       console.log('Preparing Replicate input...');
 
-      // Map haircut description to Replicate's expected format
-      // The API expects specific haircut types or "Random"
+      // Prepare input for Replicate API
       const input = {
-        haircut: haircutDescription,
-        hair_color: "Random",
+        haircut: options.haircut,
+        hair_color: options.hair_color,
+        gender: options.gender,
         input_image: base64DataUri
       };
 
@@ -68,6 +65,7 @@ class AIService {
       console.log('Input:', {
         haircut: input.haircut,
         hair_color: input.hair_color,
+        gender: input.gender,
         input_image: 'base64 image data'
       });
 
@@ -120,8 +118,8 @@ class AIService {
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const outputPath = join(__dirname, '../../uploads', filename);
-      await writeFile(outputPath, buffer);
+      const outputPath = path.join(__dirname, '../../uploads', filename);
+      await fs.writeFile(outputPath, buffer);
 
       console.log('✓ Result saved to:', outputPath);
       return outputPath;
@@ -132,4 +130,4 @@ class AIService {
   }
 }
 
-export default new AIService();
+module.exports = new AIService();

@@ -3,7 +3,7 @@ const aiService = require('../services/aiService');
 // Generate hair simulation
 const generateSimulation = async (req, res) => {
   try {
-    const { imageBase64, haircutDescription } = req.body;
+    const { imageBase64, haircut, hair_color, gender } = req.body;
 
     if (!imageBase64) {
       return res.status(400).json({
@@ -12,15 +12,17 @@ const generateSimulation = async (req, res) => {
       });
     }
 
-    if (!haircutDescription) {
-      return res.status(400).json({
-        success: false,
-        message: 'Haircut description is required'
-      });
-    }
+    // Set defaults if not provided
+    const options = {
+      haircut: haircut || 'Random',
+      hair_color: hair_color || 'Random',
+      gender: gender || 'Auto-detect'
+    };
 
-    // Call AI Service (NanoBanana or Google Gemini)
-    const result = await aiService.changeHaircut(imageBase64, haircutDescription);
+    console.log('Generating simulation with options:', options);
+
+    // Call AI Service (Replicate)
+    const result = await aiService.changeHaircut(imageBase64, options);
 
     res.status(200).json({
       success: true,
@@ -28,7 +30,7 @@ const generateSimulation = async (req, res) => {
       data: {
         originalImage: imageBase64,
         resultImage: result,
-        description: haircutDescription
+        options: options
       }
     });
   } catch (error) {
