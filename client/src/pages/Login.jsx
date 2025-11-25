@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Input from '../components/common/Input';
-import Button from '../components/common/Button';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -23,14 +21,12 @@ const Login = () => {
       ...prev,
       [name]: value
     }));
-    // Clear error for this field only
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
         [name]: ''
       }));
     }
-    // Don't auto-clear general error - let user dismiss it by typing
   };
 
   const validateForm = () => {
@@ -62,7 +58,6 @@ const Login = () => {
     try {
       await login(formData.email, formData.password);
 
-      // Handle remember me
       if (rememberMe) {
         localStorage.setItem('rememberedEmail', formData.email);
       } else {
@@ -71,10 +66,8 @@ const Login = () => {
 
       navigate('/dashboard');
     } catch (error) {
-      // Handle backend validation errors
       const backendErrors = error.response?.data?.errors;
       if (backendErrors && Array.isArray(backendErrors)) {
-        // Map backend errors to form fields
         const newErrors = {};
         backendErrors.forEach(err => {
           if (err.path) {
@@ -96,63 +89,71 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-black py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/register" className="font-medium text-purple-600 hover:text-purple-500">
-              create a new account
-            </Link>
-          </p>
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-white mb-2">AI Hair Simulation</h1>
+          <h2 className="text-xl text-gray-400">Sign in to your account</h2>
         </div>
 
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-md" onSubmit={handleSubmit}>
+        {/* Form Card */}
+        <form
+          className="bg-gray-900 border border-gray-800 p-8 rounded-lg space-y-6"
+          onSubmit={handleSubmit}
+        >
+          {/* General Error */}
           {errors.general && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-              <span className="block sm:inline">{errors.general}</span>
+            <div className="bg-red-900 bg-opacity-30 border border-red-800 text-red-300 px-4 py-3 rounded-lg relative">
+              <span className="block sm:inline text-sm">{errors.general}</span>
               <button
                 type="button"
                 onClick={() => setErrors(prev => ({ ...prev, general: '' }))}
-                className="absolute top-0 bottom-0 right-0 px-4 py-3"
+                className="absolute top-0 bottom-0 right-0 px-4 py-3 text-red-400 hover:text-red-300"
               >
-                <svg className="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/>
                 </svg>
               </button>
             </div>
           )}
 
-          <div className="space-y-4">
-            <Input
-              label="Email address"
+          {/* Email Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Email address
+            </label>
+            <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
               placeholder="Enter your email"
-              error={errors.email}
-              required
+              className={`w-full bg-gray-800 border ${errors.email ? 'border-red-500' : 'border-gray-700'} text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-600 placeholder-gray-500`}
             />
+            {errors.email && (
+              <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+            )}
+          </div>
 
+          {/* Password Field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Password
+            </label>
             <div className="relative">
-              <Input
-                label="Password"
+              <input
                 type={showPassword ? "text" : "password"}
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
-                error={errors.password}
-                required
+                className={`w-full bg-gray-800 border ${errors.password ? 'border-red-500' : 'border-gray-700'} text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-600 placeholder-gray-500 pr-12`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-9 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
               >
                 {showPassword ? (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,8 +167,12 @@ const Login = () => {
                 )}
               </button>
             </div>
+            {errors.password && (
+              <p className="mt-1 text-sm text-red-400">{errors.password}</p>
+            )}
           </div>
 
+          {/* Remember Me & Forgot Password */}
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
@@ -176,27 +181,40 @@ const Login = () => {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                className="h-4 w-4 bg-gray-800 border-gray-700 rounded text-white focus:ring-0 focus:ring-offset-0"
               />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-400">
                 Remember me
               </label>
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-purple-600 hover:text-purple-500">
-                Forgot your password?
+              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                Forgot password?
               </a>
             </div>
           </div>
 
-          <Button
+          {/* Submit Button */}
+          <button
             type="submit"
-            className="w-full"
             disabled={isLoading}
+            className={`w-full py-3 rounded-lg font-medium text-sm transition-colors ${
+              isLoading
+                ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                : 'bg-white text-black hover:bg-gray-200'
+            }`}
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
-          </Button>
+          </button>
+
+          {/* Register Link */}
+          <p className="text-center text-sm text-gray-400">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-white hover:underline">
+              Create account
+            </Link>
+          </p>
         </form>
       </div>
     </div>
