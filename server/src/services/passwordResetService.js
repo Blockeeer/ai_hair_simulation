@@ -1,13 +1,17 @@
 const crypto = require('crypto');
-const { db } = require('../config/firebase');
+const { getFirestore } = require('../config/firebase');
 
 class PasswordResetService {
   constructor() {
     this.collectionName = 'passwordResets';
   }
 
+  get db() {
+    return getFirestore();
+  }
+
   get resetTokensCollection() {
-    return db.collection(this.collectionName);
+    return this.db.collection(this.collectionName);
   }
 
   // Generate a cryptographically secure random token
@@ -99,7 +103,7 @@ class PasswordResetService {
       .where('used', '==', false)
       .get();
 
-    const batch = db.batch();
+    const batch = this.db.batch();
     snapshot.docs.forEach(doc => {
       batch.update(doc.ref, { used: true, invalidatedAt: new Date() });
     });
@@ -137,7 +141,7 @@ class PasswordResetService {
       .where('used', '==', false)
       .get();
 
-    const batch = db.batch();
+    const batch = this.db.batch();
     snapshot.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
