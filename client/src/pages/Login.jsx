@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, googleAuth } = useAuth();
 
   const [formData, setFormData] = useState({
     email: localStorage.getItem('rememberedEmail') || '',
@@ -86,6 +87,28 @@ const Login = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      await googleAuth(credentialResponse.credential);
+      navigate('/dashboard');
+    } catch (error) {
+      setErrors({
+        general: error.response?.data?.message || 'Google sign-in failed. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setErrors({
+      general: 'Google sign-in failed. Please try again.'
+    });
   };
 
   return (
@@ -207,6 +230,29 @@ const Login = () => {
           >
             {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-gray-900 text-gray-400">or continue with</span>
+            </div>
+          </div>
+
+          {/* Google Sign In */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              theme="filled_black"
+              size="large"
+              width="100%"
+              text="signin_with"
+              shape="rectangular"
+            />
+          </div>
 
           {/* Register Link */}
           <p className="text-center text-sm text-gray-400">

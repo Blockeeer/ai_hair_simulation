@@ -5,11 +5,13 @@ const router = express.Router();
 const authRoutes = require('./authRoutes');
 const hairRoutes = require('./hairRoutes');
 const simulationRoutes = require('./simulationRoutes');
+const historyRoutes = require('./historyRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/hair', hairRoutes);
 router.use('/simulation', simulationRoutes);
+router.use('/history', historyRoutes);
 
 // Health check route
 router.get('/health', (req, res) => {

@@ -12,11 +12,11 @@ const generateSimulation = async (req, res) => {
       });
     }
 
-    // Set defaults if not provided
+    // Set defaults if not provided (must match Replicate API accepted values)
     const options = {
       haircut: haircut || 'Random',
       hair_color: hair_color || 'Random',
-      gender: gender || 'Auto-detect'
+      gender: gender || 'none'
     };
 
     console.log('Generating simulation with options:', options);

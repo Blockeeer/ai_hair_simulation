@@ -31,14 +31,15 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       // Handle 401 Unauthorized - only redirect if user is already logged in
-      // Don't redirect on login/register pages (they handle their own errors)
+      // Don't redirect on login/register pages or password change (they handle their own errors)
       if (error.response.status === 401) {
         const token = localStorage.getItem('token');
-        const isLoginOrRegister = error.config.url.includes('/auth/login') ||
-                                   error.config.url.includes('/auth/register');
+        const isAuthEndpoint = error.config.url.includes('/auth/login') ||
+                               error.config.url.includes('/auth/register') ||
+                               error.config.url.includes('/auth/password');
 
-        // Only redirect if there was a token (user was logged in) and it's not a login/register attempt
-        if (token && !isLoginOrRegister) {
+        // Only redirect if there was a token (user was logged in) and it's not an auth endpoint
+        if (token && !isAuthEndpoint) {
           localStorage.removeItem('token');
           window.location.href = '/login';
         }

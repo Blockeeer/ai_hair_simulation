@@ -21,7 +21,7 @@ class AIService {
    * Main method to change haircut using Replicate API
    */
   async changeHaircut(imageBase64, options = {}) {
-    const { haircut = 'Random', hair_color = 'Random', gender = 'Auto-detect' } = options;
+    const { haircut = 'Random', hair_color = 'Random', gender = 'none' } = options;
 
     console.log('Starting haircut generation with Replicate...');
     console.log('Options:', { haircut, hair_color, gender });

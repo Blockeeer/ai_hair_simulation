@@ -212,6 +212,14 @@ exports.changePassword = async (req, res) => {
       });
     }
 
+    // Check if user signed up with Google (no password)
+    if (user.authProvider === 'google' && !user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot change password for Google sign-in accounts'
+      });
+    }
+
     // Verify current password
     const isPasswordValid = await userService.comparePassword(currentPassword, user.password);
     if (!isPasswordValid) {
@@ -243,6 +251,75 @@ exports.changePassword = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error changing password',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Google OAuth login/register
+// @route   POST /api/auth/google
+// @access  Public
+exports.googleAuth = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google credential is required'
+      });
+    }
+
+    // Decode the Google JWT token to get user info
+    // The credential is a JWT token from Google
+    const base64Url = credential.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    const googleUserData = JSON.parse(jsonPayload);
+
+    // Verify the token is from Google and not expired
+    if (!googleUserData.email || !googleUserData.sub) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Google credential'
+      });
+    }
+
+    // Check token expiry
+    const now = Math.floor(Date.now() / 1000);
+    if (googleUserData.exp && googleUserData.exp < now) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google credential has expired'
+      });
+    }
+
+    // Find or create user
+    const { user, isNewUser } = await userService.findOrCreateGoogleUser(googleUserData);
+
+    // Update last login
+    await userService.updateLastLogin(user.id);
+
+    // Generate JWT token
+    const token = generateToken(user.id);
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Account created successfully' : 'Login successful',
+      token,
+      user,
+      isNewUser
+    });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error with Google authentication',
       error: error.message
     });
   }

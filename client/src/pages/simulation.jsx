@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import ImageCropModal from '../components/ImageCropModal';
 
 const Simulation = () => {
   const navigate = useNavigate();
@@ -9,28 +10,66 @@ const Simulation = () => {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [resultImage, setResultImage] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [rawImage, setRawImage] = useState(null);
 
   // Replicate options
   const [haircut, setHaircut] = useState('Random');
   const [hairColor, setHairColor] = useState('Random');
-  const [gender, setGender] = useState('Auto-detect');
+  const [gender, setGender] = useState('none');
 
-  // Options from Replicate playground
-  const haircutOptions = [
-    'Random', 'Afro', 'Bob', 'Bowl cut', 'Braids', 'Bun', 'Buzz cut',
-    'Cornrows', 'Crew cut', 'Curly', 'Dreadlocks', 'Fade', 'Long hair',
-    'Mohawk', 'Mullet', 'Pixie cut', 'Pompadour', 'Ponytail', 'Short hair',
-    'Side part', 'Straight hair', 'Undercut', 'Wavy hair', 'Wolf cut'
-  ];
+  // Exact options from Replicate API (flux-kontext-apps/change-haircut) - organized by category
+  const haircutCategories = {
+    general: ['No change', 'Random'],
+    male: [
+      'Crew Cut', 'Undercut', 'Mohawk', 'Faux Hawk', 'Mohawk Fade',
+      'Slicked Back', 'Side-Parted', 'Buzz Cut', 'Fade', 'Taper Fade'
+    ],
+    female: [
+      'Bob', 'Pixie Cut', 'Lob', 'Angled Bob', 'A-Line Bob', 'Asymmetrical Bob',
+      'Graduated Bob', 'Inverted Bob', 'Sideswept Pixie', 'Pageboy',
+      'Messy Bun', 'High Ponytail', 'Low Ponytail', 'Braided Ponytail',
+      'Space Buns', 'Top Knot', 'Pigtails', 'Half-Up Top Knot', 'Half-Up, Half-Down',
+      'French Braid', 'Dutch Braid', 'Fishtail Braid', 'Box Braids', 'Crochet Braids',
+      'Double Dutch Braids', 'French Fishtail Braid', 'Waterfall Braid', 'Rope Braid',
+      'Heart Braid', 'Halo Braid', 'Crown Braid', 'Braided Crown', 'Bubble Braid',
+      'Bubble Ponytail', 'Ballerina Braids', 'Milkmaid Braids', 'Bohemian Braids',
+      'Messy Fishtail Braid',
+      'Chignon', 'Simple Chignon', 'Messy Chignon', 'French Twist', 'French Twist Updo',
+      'French Roll', 'Updo', 'Messy Updo', 'Knotted Updo', 'Ballerina Bun',
+      'Banana Clip Updo', 'Beehive', 'Bouffant', 'Hair Bow', 'Twisted Bun',
+      'Twisted Half-Updo', 'Twist and Pin Updo',
+      'Messy Bun with a Headband', 'Messy Bun with a Scarf',
+      'Blunt Bangs', 'Side-Swept Bangs', 'Victory Rolls',
+      'Glamorous Waves', 'Hollywood Waves', 'Finger Waves', 'Pin Curls', 'Rollerset'
+    ],
+    unisex: [
+      'Straight', 'Wavy', 'Curly', 'Layered', 'Shag', 'Layered Shag', 'Choppy Layers',
+      'Center-Parted', 'Razor Cut', 'Perm', 'Ombré', 'Straightened',
+      'Soft Waves', 'Tousled', 'Feathered',
+      'Twist Out', 'Bantu Knots', 'Dreadlocks', 'Cornrows',
+      'Flat Twist', 'Crown Twist', 'Zig-Zag Part'
+    ]
+  };
 
   const hairColorOptions = [
-    'Random', 'Black', 'Blonde', 'Brown', 'Red', 'Gray',
-    'White', 'Blue', 'Green', 'Pink', 'Purple'
+    'No change', 'Random', 'Black', 'Dark Brown', 'Medium Brown', 'Light Brown',
+    'Dirty Blonde', 'Golden Blonde', 'Platinum Blonde', 'Strawberry Blonde',
+    'Auburn', 'Copper', 'Ginger', 'Red', 'Burgundy', 'Gray', 'Silver', 'White',
+    'Blue', 'Purple', 'Pink', 'Green', 'Teal', 'Lavender', 'Rose Gold',
+    'Ombré Brown to Blonde', 'Ombré Black to Red', 'Balayage', 'Highlights'
   ];
 
-  const genderOptions = ['Auto-detect', 'Male', 'Female'];
+  // Gender options - API requires lowercase values
+  const genderOptions = [
+    { label: 'Auto-detect', value: 'none' },
+    { label: 'Male', value: 'male' },
+    { label: 'Female', value: 'female' }
+  ];
 
   const handleLogout = () => {
     logout();
@@ -68,30 +107,22 @@ const Simulation = () => {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        const SIZE = 512;
-        canvas.width = SIZE;
-        canvas.height = SIZE;
-
-        const scale = Math.max(SIZE / img.width, SIZE / img.height);
-        const scaledWidth = img.width * scale;
-        const scaledHeight = img.height * scale;
-
-        const x = (SIZE - scaledWidth) / 2;
-        const y = (SIZE - scaledHeight) / 2;
-
-        ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
-
-        const processedImage = canvas.toDataURL('image/jpeg', 1.0);
-        setUploadedImage(processedImage);
-      };
-      img.src = e.target.result;
+      // Store raw image and show crop modal
+      setRawImage(e.target.result);
+      setShowCropModal(true);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCropConfirm = (croppedImage) => {
+    setUploadedImage(croppedImage);
+    setShowCropModal(false);
+    setRawImage(null);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropModal(false);
+    setRawImage(null);
   };
 
   const handleRemoveImage = () => {
@@ -103,7 +134,7 @@ const Simulation = () => {
   const handleReset = () => {
     setHaircut('Random');
     setHairColor('Random');
-    setGender('Auto-detect');
+    setGender('none');
     setError('');
   };
 
@@ -115,6 +146,7 @@ const Simulation = () => {
 
     setIsGenerating(true);
     setError('');
+    setSuccess('');
 
     try {
       const response = await api.post('/simulation/generate', {
@@ -135,8 +167,49 @@ const Simulation = () => {
     }
   };
 
+  const handleSave = async () => {
+    if (!uploadedImage || !resultImage) {
+      setError('No simulation to save');
+      return;
+    }
+
+    setIsSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await api.post('/history', {
+        originalImage: uploadedImage,
+        resultImage: resultImage,
+        haircut: haircut,
+        hairColor: hairColor,
+        gender: gender
+      });
+
+      if (response.data.success) {
+        setSuccess('Simulation saved to history!');
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save simulation');
+      console.error('Save error:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black">
+      {/* Image Crop Modal */}
+      {showCropModal && rawImage && (
+        <ImageCropModal
+          imageUrl={rawImage}
+          onCrop={handleCropConfirm}
+          onCancel={handleCropCancel}
+          cropSize={512}
+        />
+      )}
+
       {/* Error Toast - Fixed position, doesn't affect layout */}
       {error && (
         <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-red-900 bg-opacity-90 border border-red-700 text-red-200 px-4 py-3 rounded-lg shadow-lg max-w-sm mx-4 flex items-center gap-3">
@@ -147,6 +220,24 @@ const Simulation = () => {
           <button
             onClick={() => setError('')}
             className="text-red-300 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {success && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-green-900 bg-opacity-90 border border-green-700 text-green-200 px-4 py-3 rounded-lg shadow-lg max-w-sm mx-4 flex items-center gap-3">
+          <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm flex-1">{success}</span>
+          <button
+            onClick={() => setSuccess('')}
+            className="text-green-300 hover:text-white transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -170,7 +261,12 @@ const Simulation = () => {
               Dashboard
             </button>
             <span className="text-gray-600">|</span>
-            <span className="text-gray-400 text-sm">{user?.username}</span>
+            <button
+              onClick={() => navigate('/profile')}
+              className="text-gray-400 hover:text-white transition-colors text-sm"
+            >
+              {user?.username}
+            </button>
             <button
               onClick={handleLogout}
               className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
@@ -197,9 +293,15 @@ const Simulation = () => {
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-gray-900 border-t border-gray-800 px-4 py-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-400 text-sm">{user?.username}</span>
-            </div>
+            <button
+              onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
+              className="flex items-center gap-2 w-full text-left text-white py-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              {user?.username}
+            </button>
             <button
               onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
               className="block w-full text-left text-gray-400 hover:text-white py-2 text-sm"
@@ -330,13 +432,36 @@ const Simulation = () => {
                 </div>
               </div>
 
-              {/* Try Another Button */}
-              <div className="text-center mt-6">
+              {/* Action Buttons */}
+              <div className="flex justify-center gap-3 mt-6">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className={`px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2 ${
+                    isSaving
+                      ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                      : 'bg-white text-black hover:bg-gray-200'
+                  }`}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-black"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                      </svg>
+                      Save
+                    </>
+                  )}
+                </button>
                 <button
                   onClick={handleRemoveImage}
                   className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors text-sm"
                 >
-                  Try Another Image
+                  Try Another
                 </button>
               </div>
             </div>
@@ -360,9 +485,24 @@ const Simulation = () => {
                   onChange={(e) => setHaircut(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-700 text-white px-2 md:px-3 py-2 rounded-lg focus:outline-none focus:border-gray-600 text-xs md:text-sm"
                 >
-                  {haircutOptions.map((option) => (
+                  {haircutCategories.general.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
+                  <optgroup label="Male Styles">
+                    {haircutCategories.male.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Female Styles">
+                    {haircutCategories.female.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Unisex Styles">
+                    {haircutCategories.unisex.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
@@ -393,7 +533,7 @@ const Simulation = () => {
                   className="w-full bg-gray-900 border border-gray-700 text-white px-2 md:px-3 py-2 rounded-lg focus:outline-none focus:border-gray-600 text-xs md:text-sm"
                 >
                   {genderOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                    <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </div>
@@ -429,7 +569,7 @@ const Simulation = () => {
               <div className="space-y-1 text-xs">
                 <p className="text-gray-300">Haircut: <span className="text-white font-medium">{haircut}</span></p>
                 <p className="text-gray-300">Color: <span className="text-white font-medium">{hairColor}</span></p>
-                <p className="text-gray-300">Gender: <span className="text-white font-medium">{gender}</span></p>
+                <p className="text-gray-300">Gender: <span className="text-white font-medium">{genderOptions.find(g => g.value === gender)?.label || gender}</span></p>
               </div>
             </div>
           </div>

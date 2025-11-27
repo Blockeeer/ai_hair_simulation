@@ -103,6 +103,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleAuth = async (credential) => {
+    try {
+      const response = await api.post('/auth/google', { credential });
+      const { token: newToken, user: userData } = response.data;
+
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+      setUser(userData);
+      setIsAuthenticated(true);
+
+      return response.data;
+    } catch (error) {
+      console.error('Google auth error:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     isAuthenticated,
@@ -112,7 +129,8 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
-    changePassword
+    changePassword,
+    googleAuth
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

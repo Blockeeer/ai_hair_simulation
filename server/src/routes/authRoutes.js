@@ -5,7 +5,8 @@ const {
   login,
   getMe,
   updateProfile,
-  changePassword
+  changePassword,
+  googleAuth
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const {
@@ -18,6 +19,7 @@ const {
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+router.post('/google', googleAuth);
 
 // Protected routes
 router.get('/me', protect, getMe);
