@@ -1,38 +1,28 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
 class EmailService {
   constructor() {
-    this.transporter = null;
     this.initialized = false;
   }
 
   initialize() {
     if (this.initialized) return;
 
-    // Check if email configuration is available
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.warn('Email service not configured. Set EMAIL_USER and EMAIL_PASSWORD environment variables.');
+    // Check if SendGrid API key is available
+    if (!process.env.SENDGRID_API_KEY) {
+      console.warn('SendGrid not configured. Set SENDGRID_API_KEY environment variable.');
       return;
     }
 
-    this.transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT) || 587,
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
     this.initialized = true;
+    console.log('SendGrid email service initialized');
   }
 
   async sendPasswordResetEmail(email, resetUrl, username) {
     this.initialize();
 
-    if (!this.transporter) {
+    if (!this.initialized) {
       console.error('Email service not configured. Cannot send password reset email.');
       throw new Error('Email service not configured');
     }
@@ -128,20 +118,26 @@ If you didn't request this password reset, you can safely ignore this email. You
 - AI Hair Simulation Team
     `;
 
-    const mailOptions = {
-      from: `"AI Hair Simulation" <${process.env.EMAIL_USER}>`,
+    const msg = {
       to: email,
+      from: {
+        email: process.env.SENDGRID_FROM_EMAIL || 'noreply@yourdomain.com',
+        name: 'AI Hair Simulation'
+      },
       subject: 'Reset Your Password - AI Hair Simulation',
       text: textContent,
       html: htmlContent
     };
 
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('Password reset email sent:', info.messageId);
-      return { success: true, messageId: info.messageId };
+      const response = await sgMail.send(msg);
+      console.log('Password reset email sent via SendGrid:', response[0].statusCode);
+      return { success: true, statusCode: response[0].statusCode };
     } catch (error) {
       console.error('Error sending password reset email:', error);
+      if (error.response) {
+        console.error('SendGrid error body:', error.response.body);
+      }
       throw error;
     }
   }
