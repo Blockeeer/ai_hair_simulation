@@ -6,20 +6,26 @@ const {
   getMe,
   updateProfile,
   changePassword,
-  googleAuth
+  googleAuth,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const {
   registerValidation,
   loginValidation,
   changePasswordValidation,
-  updateProfileValidation
+  updateProfileValidation,
+  forgotPasswordValidation,
+  resetPasswordValidation
 } = require('../middleware/validation');
 
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
 router.post('/google', googleAuth);
+router.post('/forgot-password', forgotPasswordValidation, forgotPassword);
+router.post('/reset-password', resetPasswordValidation, resetPassword);
 
 // Protected routes
 router.get('/me', protect, getMe);

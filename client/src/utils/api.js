@@ -36,7 +36,9 @@ api.interceptors.response.use(
         const token = localStorage.getItem('token');
         const isAuthEndpoint = error.config.url.includes('/auth/login') ||
                                error.config.url.includes('/auth/register') ||
-                               error.config.url.includes('/auth/password');
+                               error.config.url.includes('/auth/password') ||
+                               error.config.url.includes('/auth/forgot-password') ||
+                               error.config.url.includes('/auth/reset-password');
 
         // Only redirect if there was a token (user was logged in) and it's not an auth endpoint
         if (token && !isAuthEndpoint) {

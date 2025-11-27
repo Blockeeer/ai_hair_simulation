@@ -212,9 +212,9 @@ const Login = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <Link to="/forgot-password" className="text-gray-400 hover:text-white transition-colors">
                 Forgot password?
-              </a>
+              </Link>
             </div>
           </div>
 

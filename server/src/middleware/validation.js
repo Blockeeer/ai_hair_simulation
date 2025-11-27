@@ -82,3 +82,25 @@ exports.updateProfileValidation = [
     .isLength({ max: 50 })
     .withMessage('Last name cannot exceed 50 characters')
 ];
+
+// Validation rules for forgot password
+exports.forgotPasswordValidation = [
+  body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+];
+
+// Validation rules for reset password
+exports.resetPasswordValidation = [
+  body('token')
+    .notEmpty()
+    .withMessage('Reset token is required'),
+
+  body('newPassword')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+];

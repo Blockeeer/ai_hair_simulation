@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
 const { getAuth } = require('../config/firebase');
 const userService = require('../services/userService');
+const passwordResetService = require('../services/passwordResetService');
+const emailService = require('../services/emailService');
 
 const auth = getAuth();
 
@@ -320,6 +323,147 @@ exports.googleAuth = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error with Google authentication',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Request password reset
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { email } = req.body;
+
+    // Always return success to prevent email enumeration
+    const successResponse = {
+      success: true,
+      message: 'If an account exists with this email, you will receive a password reset link shortly.'
+    };
+
+    // Find user by email
+    const user = await userService.findByEmail(email);
+
+    if (!user) {
+      // Return success even if user doesn't exist (security)
+      return res.json(successResponse);
+    }
+
+    // Check if user signed up with Google (no password reset for OAuth users)
+    if (user.authProvider === 'google' && !user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'This account uses Google sign-in. Please use "Continue with Google" to access your account.'
+      });
+    }
+
+    // Check rate limiting
+    const rateLimit = await passwordResetService.checkRateLimit(email);
+    if (!rateLimit.allowed) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many password reset requests. Please try again later.'
+      });
+    }
+
+    // Generate reset token
+    const { token } = await passwordResetService.createResetToken(email, user.id);
+
+    // Build reset URL
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetUrl = `${clientUrl}/reset-password/${token}`;
+
+    // Send email
+    try {
+      await emailService.sendPasswordResetEmail(email, resetUrl, user.username || user.firstName);
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+      // Don't reveal email sending failure to prevent enumeration
+    }
+
+    res.json(successResponse);
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing password reset request',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Reset password with token
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { token, newPassword } = req.body;
+
+    // Validate token
+    const validation = await passwordResetService.validateResetToken(token);
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: validation.error || 'Invalid or expired reset token'
+      });
+    }
+
+    // Find user
+    const user = await userService.findById(validation.userId);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password in Firestore
+    await userService.updateUser(validation.userId, { password: hashedPassword });
+
+    // Update password in Firebase Auth
+    try {
+      await auth.updateUser(validation.userId, {
+        password: newPassword
+      });
+    } catch (firebaseError) {
+      console.error('Firebase Auth update error:', firebaseError);
+      // Continue even if Firebase Auth update fails
+    }
+
+    // Mark token as used
+    await passwordResetService.markTokenUsed(validation.tokenId);
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now login with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting password',
       error: error.message
     });
   }
