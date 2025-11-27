@@ -27,7 +27,7 @@ const Simulation = () => {
     general: ['No change', 'Random'],
     male: [
       'Crew Cut', 'Undercut', 'Mohawk', 'Faux Hawk', 'Mohawk Fade',
-      'Slicked Back', 'Side-Parted', 'Buzz Cut', 'Fade', 'Taper Fade'
+      'Slicked Back', 'Side-Parted'
     ],
     female: [
       'Bob', 'Pixie Cut', 'Lob', 'Angled Bob', 'A-Line Bob', 'Asymmetrical Bob',
@@ -57,11 +57,11 @@ const Simulation = () => {
   };
 
   const hairColorOptions = [
-    'No change', 'Random', 'Black', 'Dark Brown', 'Medium Brown', 'Light Brown',
-    'Dirty Blonde', 'Golden Blonde', 'Platinum Blonde', 'Strawberry Blonde',
-    'Auburn', 'Copper', 'Ginger', 'Red', 'Burgundy', 'Gray', 'Silver', 'White',
-    'Blue', 'Purple', 'Pink', 'Green', 'Teal', 'Lavender', 'Rose Gold',
-    'Ombré Brown to Blonde', 'Ombré Black to Red', 'Balayage', 'Highlights'
+    'No change', 'Random', 'Blonde', 'Brunette', 'Black', 'Dark Brown', 'Medium Brown',
+    'Light Brown', 'Auburn', 'Copper', 'Red', 'Strawberry Blonde', 'Platinum Blonde',
+    'Silver', 'White', 'Blue', 'Purple', 'Pink', 'Green', 'Blue-Black', 'Golden Blonde',
+    'Honey Blonde', 'Caramel', 'Chestnut', 'Mahogany', 'Burgundy', 'Jet Black',
+    'Ash Brown', 'Ash Blonde', 'Titanium', 'Rose Gold'
   ];
 
   // Gender options - API requires lowercase values
