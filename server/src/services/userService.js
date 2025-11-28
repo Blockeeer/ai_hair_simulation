@@ -50,7 +50,8 @@ class UserService {
       savedSimulations: [],
       createdAt: new Date(),
       lastLogin: null,
-      isActive: true
+      isActive: true,
+      emailVerified: false
     };
 
     await this.usersCollection.doc(firebaseUser.uid).set(userDoc);
@@ -113,8 +114,17 @@ class UserService {
       firstName: user.firstName,
       lastName: user.lastName,
       profileImage: user.profileImage,
-      createdAt: user.createdAt
+      createdAt: user.createdAt,
+      emailVerified: user.emailVerified || false
     };
+  }
+
+  async markEmailVerified(userId) {
+    await this.usersCollection.doc(userId).update({
+      emailVerified: true,
+      emailVerifiedAt: new Date()
+    });
+    return await this.findById(userId);
   }
 
   // Create or get user from Google OAuth
@@ -181,7 +191,8 @@ class UserService {
       createdAt: new Date(),
       lastLogin: new Date(),
       isActive: true,
-      authProvider: 'google'
+      authProvider: 'google',
+      emailVerified: true // Google users are already verified
     };
 
     await this.usersCollection.doc(firebaseUser.uid).set(userDoc);

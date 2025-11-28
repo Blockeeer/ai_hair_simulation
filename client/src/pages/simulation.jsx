@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import EmailVerificationBanner from '../components/EmailVerificationBanner';
+import ImageCompareSlider from '../components/ImageCompareSlider';
 import api from '../utils/api';
 import ImageCropModal from '../components/ImageCropModal';
 
 const Simulation = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isDark } = useTheme();
   const [uploadedImage, setUploadedImage] = useState(null);
   const [resultImage, setResultImage] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -16,6 +20,12 @@ const Simulation = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
   const [rawImage, setRawImage] = useState(null);
+  const [viewMode, setViewMode] = useState('slider'); // 'slider' or 'sideBySide'
+
+  // Queue status
+  const [queueStatus, setQueueStatus] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const elapsedTimerRef = useRef(null);
 
   // Replicate options
   const [haircut, setHaircut] = useState('Random');
@@ -70,6 +80,56 @@ const Simulation = () => {
     { label: 'Male', value: 'male' },
     { label: 'Female', value: 'female' }
   ];
+
+  // Fetch queue status on mount and periodically
+  useEffect(() => {
+    const fetchQueueStatus = async () => {
+      try {
+        const response = await api.get('/simulation/queue-status');
+        if (response.data.success) {
+          setQueueStatus(response.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch queue status:', err);
+      }
+    };
+
+    fetchQueueStatus();
+    const interval = setInterval(fetchQueueStatus, 10000); // Update every 10 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Elapsed time timer during generation
+  useEffect(() => {
+    if (isGenerating) {
+      setElapsedTime(0);
+      elapsedTimerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+      }
+    };
+  }, [isGenerating]);
+
+  // Format seconds to readable time
+  const formatTime = (seconds) => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
 
   const handleLogout = () => {
     logout();
@@ -198,8 +258,53 @@ const Simulation = () => {
     }
   };
 
+  const handleDownload = async () => {
+    if (!resultImage) {
+      setError('No image to download');
+      return;
+    }
+
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a');
+
+      // If resultImage is a URL (from Cloudinary), fetch it first
+      if (resultImage.startsWith('http')) {
+        const response = await fetch(resultImage);
+        const blob = await response.blob();
+        link.href = URL.createObjectURL(blob);
+      } else {
+        // If it's a base64 image
+        link.href = resultImage;
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+      link.download = `hair-simulation-${timestamp}.png`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up object URL if created
+      if (resultImage.startsWith('http')) {
+        URL.revokeObjectURL(link.href);
+      }
+
+      setSuccess('Image downloaded!');
+      setTimeout(() => setSuccess(''), 2000);
+    } catch (err) {
+      setError('Failed to download image');
+      console.error('Download error:', err);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-black">
+    <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-black' : 'bg-gray-100'}`}>
+      {/* Email Verification Banner */}
+      <EmailVerificationBanner />
+
       {/* Image Crop Modal */}
       {showCropModal && rawImage && (
         <ImageCropModal
@@ -247,29 +352,42 @@ const Simulation = () => {
       )}
 
       {/* Responsive Navbar */}
-      <header className="bg-black border-b border-gray-800 sticky top-0 z-50">
+      <header className={`${isDark ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-50 transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           {/* Logo */}
-          <h1 className="text-lg md:text-xl font-bold text-white">AI Hair Simulation</h1>
+          <h1 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>AI Hair Simulation</h1>
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="text-gray-400 hover:text-white transition-colors text-sm"
+              className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
             >
               Dashboard
             </button>
-            <span className="text-gray-600">|</span>
+            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
             <button
               onClick={() => navigate('/profile')}
-              className="text-gray-400 hover:text-white transition-colors text-sm"
+              className={`flex items-center gap-2 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
             >
+              {user?.profileImage ? (
+                <img
+                  src={user.profileImage}
+                  alt=""
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <div className={`w-6 h-6 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
+                  <svg className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
               {user?.username}
             </button>
             <button
               onClick={handleLogout}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+              className={`${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg transition-colors text-sm`}
             >
               Logout
             </button>
@@ -278,7 +396,7 @@ const Simulation = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-white p-2"
+            className={`md:hidden ${isDark ? 'text-white' : 'text-gray-900'} p-2`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileMenuOpen ? (
@@ -292,25 +410,33 @@ const Simulation = () => {
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-gray-900 border-t border-gray-800 px-4 py-3 space-y-3">
+          <div className={`md:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-t px-4 py-3 space-y-3`}>
             <button
               onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
-              className="flex items-center gap-2 w-full text-left text-white py-2 text-sm"
+              className={`flex items-center gap-2 w-full text-left ${isDark ? 'text-white' : 'text-gray-900'} py-2 text-sm`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+              {user?.profileImage ? (
+                <img
+                  src={user.profileImage}
+                  alt=""
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
               {user?.username}
             </button>
             <button
               onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
-              className="block w-full text-left text-gray-400 hover:text-white py-2 text-sm"
+              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
             >
               Dashboard
             </button>
             <button
               onClick={handleLogout}
-              className="block w-full bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm text-center"
+              className={`block w-full ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg text-sm text-center`}
             >
               Logout
             </button>
@@ -323,7 +449,7 @@ const Simulation = () => {
 
         {/* Image Upload/Display Area - Comes first on mobile */}
         <div
-          className="flex-1 flex items-center justify-center bg-black p-4 md:p-8 order-1 lg:order-2"
+          className={`flex-1 flex items-center justify-center ${isDark ? 'bg-black' : 'bg-gray-100'} p-4 md:p-8 order-1 lg:order-2 transition-colors duration-300`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -331,7 +457,7 @@ const Simulation = () => {
           {!uploadedImage ? (
             /* Upload Area */
             <div className="text-center w-full max-w-sm">
-              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 md:p-12 hover:border-gray-600 transition-colors">
+              <div className={`border-2 border-dashed ${isDark ? 'border-gray-700 hover:border-gray-600' : 'border-gray-300 hover:border-gray-400'} rounded-lg p-6 md:p-12 transition-colors`}>
                 <input
                   type="file"
                   accept="image/*"
@@ -344,7 +470,7 @@ const Simulation = () => {
                   className="cursor-pointer flex flex-col items-center"
                 >
                   <svg
-                    className="w-12 h-12 md:w-16 md:h-16 text-gray-600 mb-3 md:mb-4"
+                    className={`w-12 h-12 md:w-16 md:h-16 ${isDark ? 'text-gray-600' : 'text-gray-400'} mb-3 md:mb-4`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -356,10 +482,10 @@ const Simulation = () => {
                       d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                     />
                   </svg>
-                  <span className="text-white font-medium mb-1 text-sm md:text-base">
+                  <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium mb-1 text-sm md:text-base`}>
                     Tap to upload photo
                   </span>
-                  <span className="text-gray-500 text-xs md:text-sm">
+                  <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs md:text-sm`}>
                     PNG, JPG up to 10MB
                   </span>
                 </label>
@@ -368,7 +494,7 @@ const Simulation = () => {
           ) : !resultImage ? (
             /* Uploaded Image Preview */
             <div className="relative w-full max-w-[300px] md:max-w-[400px]">
-              <div className="aspect-square bg-gray-900 rounded-lg overflow-hidden border border-gray-800 relative">
+              <div className={`aspect-square ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg overflow-hidden border relative`}>
                 <img
                   src={uploadedImage}
                   alt="Uploaded"
@@ -384,60 +510,117 @@ const Simulation = () => {
                   </svg>
                 </button>
                 {isGenerating && (
-                  <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
-                    <div className="text-center text-white">
-                      <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-t-2 border-b-2 border-white mx-auto mb-2 md:mb-3"></div>
-                      <p className="text-xs md:text-sm">Generating...</p>
+                  <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center">
+                    <div className="text-center text-white px-4">
+                      <div className="animate-spin rounded-full h-10 w-10 md:h-12 md:w-12 border-t-2 border-b-2 border-white mx-auto mb-3"></div>
+                      <p className="text-sm md:text-base font-medium mb-1">Generating your new look...</p>
+                      <p className="text-xs text-gray-300 mb-2">
+                        Elapsed: {formatTime(elapsedTime)}
+                      </p>
+                      {queueStatus && queueStatus.activeJobs > 1 && (
+                        <div className="mt-2 text-xs text-gray-400 bg-gray-800 bg-opacity-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>{queueStatus.activeJobs} jobs in queue</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
-              <p className="text-gray-400 text-center mt-3 text-xs md:text-sm">
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-center mt-3 text-xs md:text-sm`}>
                 Image ready. Configure settings below and generate.
               </p>
             </div>
           ) : (
             /* Before/After Result */
             <div className="w-full max-w-4xl px-2">
-              {/* Mobile: Stack vertically, Desktop: Side by side */}
-              <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center">
-                {/* Before Image */}
-                <div className="text-center w-full max-w-[280px] md:max-w-[350px]">
-                  <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-3">Before</p>
-                  <div className="aspect-square bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
-                    <img
-                      src={uploadedImage}
-                      alt="Before"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-
-                {/* Arrow - Hidden on mobile, shown on desktop */}
-                <div className="hidden md:block text-4xl text-gray-600">→</div>
-
-                {/* Arrow - Mobile vertical */}
-                <div className="md:hidden text-2xl text-gray-600">↓</div>
-
-                {/* After Image */}
-                <div className="text-center w-full max-w-[280px] md:max-w-[350px]">
-                  <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-3">After</p>
-                  <div className="aspect-square bg-gray-900 rounded-lg overflow-hidden border border-white">
-                    <img
-                      src={resultImage}
-                      alt="After"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+              {/* View Mode Toggle */}
+              <div className="flex justify-center mb-4">
+                <div className="bg-gray-800 rounded-lg p-1 flex gap-1">
+                  <button
+                    onClick={() => setViewMode('slider')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'slider'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                    </svg>
+                    Slider
+                  </button>
+                  <button
+                    onClick={() => setViewMode('sideBySide')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'sideBySide'
+                        ? 'bg-white text-black'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                    </svg>
+                    Side by Side
+                  </button>
                 </div>
               </div>
+
+              {/* Slider View */}
+              {viewMode === 'slider' ? (
+                <div className="flex justify-center">
+                  <div className="w-full max-w-[350px] md:max-w-[450px]">
+                    <ImageCompareSlider
+                      beforeImage={uploadedImage}
+                      afterImage={resultImage}
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Side by Side View */
+                <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-center justify-center">
+                  {/* Before Image */}
+                  <div className="text-center w-full max-w-[280px] md:max-w-[350px]">
+                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-3">Before</p>
+                    <div className="aspect-square bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
+                      <img
+                        src={uploadedImage}
+                        alt="Before"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Arrow - Hidden on mobile, shown on desktop */}
+                  <div className="hidden md:block text-4xl text-gray-600">→</div>
+
+                  {/* Arrow - Mobile vertical */}
+                  <div className="md:hidden text-2xl text-gray-600">↓</div>
+
+                  {/* After Image */}
+                  <div className="text-center w-full max-w-[280px] md:max-w-[350px]">
+                    <p className="text-gray-400 text-xs md:text-sm mb-2 md:mb-3">After</p>
+                    <div className="aspect-square bg-gray-900 rounded-lg overflow-hidden border border-white">
+                      <img
+                        src={resultImage}
+                        alt="After"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex justify-center gap-3 mt-6">
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className={`px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2 ${
+                  className={`px-4 md:px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2 ${
                     isSaving
                       ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                       : 'bg-white text-black hover:bg-gray-200'
@@ -458,8 +641,17 @@ const Simulation = () => {
                   )}
                 </button>
                 <button
+                  onClick={handleDownload}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 md:px-6 py-2 rounded-lg transition-colors text-sm flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download
+                </button>
+                <button
                   onClick={handleRemoveImage}
-                  className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors text-sm"
+                  className="bg-gray-800 hover:bg-gray-700 text-white px-4 md:px-6 py-2 rounded-lg transition-colors text-sm"
                 >
                   Try Another
                 </button>
@@ -469,21 +661,21 @@ const Simulation = () => {
         </div>
 
         {/* Settings Panel - Below on mobile, Left side on desktop */}
-        <aside className="w-full lg:w-80 bg-black border-t lg:border-t-0 lg:border-r border-gray-800 p-4 md:p-6 order-2 lg:order-1 lg:overflow-y-auto">
-          <h2 className="text-base md:text-lg font-semibold text-white mb-4 md:mb-6">Settings</h2>
+        <aside className={`w-full lg:w-80 ${isDark ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-t lg:border-t-0 lg:border-r p-4 md:p-6 order-2 lg:order-1 lg:overflow-y-auto transition-colors duration-300`}>
+          <h2 className={`text-base md:text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-4 md:mb-6`}>Settings</h2>
 
           <div className="space-y-4 md:space-y-5">
             {/* Dropdowns in a grid on mobile */}
             <div className="grid grid-cols-3 lg:grid-cols-1 gap-3 md:gap-4 lg:gap-5">
               {/* Haircut Dropdown */}
               <div>
-                <label className="block text-xs md:text-sm font-medium text-gray-300 mb-1.5 md:mb-2">
+                <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
                   Haircut
                 </label>
                 <select
                   value={haircut}
                   onChange={(e) => setHaircut(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-white px-2 md:px-3 py-2 rounded-lg focus:outline-none focus:border-gray-600 text-xs md:text-sm"
+                  className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
                 >
                   {haircutCategories.general.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -508,13 +700,13 @@ const Simulation = () => {
 
               {/* Hair Color Dropdown */}
               <div>
-                <label className="block text-xs md:text-sm font-medium text-gray-300 mb-1.5 md:mb-2">
+                <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
                   Hair Color
                 </label>
                 <select
                   value={hairColor}
                   onChange={(e) => setHairColor(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-white px-2 md:px-3 py-2 rounded-lg focus:outline-none focus:border-gray-600 text-xs md:text-sm"
+                  className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
                 >
                   {hairColorOptions.map((option) => (
                     <option key={option} value={option}>{option}</option>
@@ -524,13 +716,13 @@ const Simulation = () => {
 
               {/* Gender Dropdown */}
               <div>
-                <label className="block text-xs md:text-sm font-medium text-gray-300 mb-1.5 md:mb-2">
+                <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
                   Gender
                 </label>
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 text-white px-2 md:px-3 py-2 rounded-lg focus:outline-none focus:border-gray-600 text-xs md:text-sm"
+                  className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
                 >
                   {genderOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -540,7 +732,27 @@ const Simulation = () => {
             </div>
 
             {/* Divider - Hidden on mobile */}
-            <div className="hidden lg:block h-px bg-gray-800 my-6"></div>
+            <div className={`hidden lg:block h-px ${isDark ? 'bg-gray-800' : 'bg-gray-200'} my-6`}></div>
+
+            {/* Queue Status Indicator */}
+            {queueStatus && queueStatus.activeJobs > 0 && !isGenerating && (
+              <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3 mb-3`}>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <div className="absolute inset-0 w-2 h-2 bg-yellow-500 rounded-full animate-ping"></div>
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {queueStatus.activeJobs} {queueStatus.activeJobs === 1 ? 'job' : 'jobs'} processing
+                    </p>
+                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Est. wait: {queueStatus.formattedWaitTime}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex lg:flex-col gap-3">
@@ -549,27 +761,27 @@ const Simulation = () => {
                 disabled={!uploadedImage || isGenerating}
                 className={`flex-1 lg:w-full py-2.5 md:py-3 rounded-lg font-medium text-xs md:text-sm transition-colors ${
                   !uploadedImage || isGenerating
-                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                    : 'bg-white text-black hover:bg-gray-200'
+                    ? isDark ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
                 }`}
               >
                 {isGenerating ? 'Generating...' : 'Generate'}
               </button>
               <button
                 onClick={handleReset}
-                className="flex-1 lg:w-full bg-gray-900 hover:bg-gray-800 text-white py-2.5 md:py-3 rounded-lg font-medium text-xs md:text-sm transition-colors"
+                className={`flex-1 lg:w-full ${isDark ? 'bg-gray-900 hover:bg-gray-800 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-900'} py-2.5 md:py-3 rounded-lg font-medium text-xs md:text-sm transition-colors`}
               >
                 Reset
               </button>
             </div>
 
             {/* Current Selection Info - Hidden on mobile */}
-            <div className="hidden lg:block mt-6 p-4 bg-gray-900 rounded-lg border border-gray-800">
-              <p className="text-xs text-gray-400 mb-2">Current Selection:</p>
+            <div className={`hidden lg:block mt-6 p-4 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} rounded-lg border`}>
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Current Selection:</p>
               <div className="space-y-1 text-xs">
-                <p className="text-gray-300">Haircut: <span className="text-white font-medium">{haircut}</span></p>
-                <p className="text-gray-300">Color: <span className="text-white font-medium">{hairColor}</span></p>
-                <p className="text-gray-300">Gender: <span className="text-white font-medium">{genderOptions.find(g => g.value === gender)?.label || gender}</span></p>
+                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Haircut: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{haircut}</span></p>
+                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Color: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{hairColor}</span></p>
+                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Gender: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{genderOptions.find(g => g.value === gender)?.label || gender}</span></p>
               </div>
             </div>
           </div>

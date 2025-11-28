@@ -5,7 +5,9 @@ const {
   getHistory,
   getSimulation,
   deleteSimulation,
-  getStats
+  getStats,
+  toggleFavorite,
+  getFavorites
 } = require('../controllers/historyController');
 const { protect } = require('../middleware/auth');
 
@@ -21,8 +23,14 @@ router.get('/', getHistory);
 // GET /api/history/stats - Get user's stats
 router.get('/stats', getStats);
 
+// GET /api/history/favorites - Get user's favorite simulations
+router.get('/favorites', getFavorites);
+
 // GET /api/history/:id - Get a single simulation
 router.get('/:id', getSimulation);
+
+// PUT /api/history/:id/favorite - Toggle favorite status
+router.put('/:id/favorite', toggleFavorite);
 
 // DELETE /api/history/:id - Delete a simulation
 router.delete('/:id', deleteSimulation);

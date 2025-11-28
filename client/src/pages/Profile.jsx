@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, logout, updateProfile, changePassword } = useAuth();
+  const { user, logout, updateProfile, changePassword, updateProfilePicture, removeProfilePicture } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
+  const fileInputRef = useRef(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
   // Profile form state
   const [profileForm, setProfileForm] = useState({
@@ -127,8 +131,78 @@ const Profile = () => {
     }
   };
 
+  const handlePictureSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Please select an image file' });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Image must be less than 5MB' });
+      return;
+    }
+
+    setIsUploadingPicture(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          await updateProfilePicture(event.target.result);
+          setMessage({ type: 'success', text: 'Profile picture updated!' });
+        } catch (error) {
+          setMessage({
+            type: 'error',
+            text: error.response?.data?.message || 'Failed to upload picture'
+          });
+        } finally {
+          setIsUploadingPicture(false);
+        }
+      };
+      reader.onerror = () => {
+        setMessage({ type: 'error', text: 'Failed to read image file' });
+        setIsUploadingPicture(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to process image' });
+      setIsUploadingPicture(false);
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemovePicture = async () => {
+    if (!user?.profileImage) return;
+
+    setIsUploadingPicture(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      await removeProfilePicture();
+      setMessage({ type: 'success', text: 'Profile picture removed!' });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Failed to remove picture'
+      });
+    } finally {
+      setIsUploadingPicture(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-black">
+    <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-black' : 'bg-gray-100'}`}>
       {/* Toast Message */}
       {message.text && (
         <div className={`fixed top-16 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg max-w-sm mx-4 flex items-center gap-3 ${
@@ -156,29 +230,44 @@ const Profile = () => {
       )}
 
       {/* Navbar */}
-      <header className="bg-black border-b border-gray-800 sticky top-0 z-40">
+      <header className={`${isDark ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-40 transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-lg md:text-xl font-bold text-white">AI Hair Simulation</h1>
+          <h1 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>AI Hair Simulation</h1>
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-4">
             <button
               onClick={() => navigate('/simulation')}
-              className="text-gray-400 hover:text-white transition-colors text-sm"
+              className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
             >
               Simulation
             </button>
             <button
               onClick={() => navigate('/dashboard')}
-              className="text-gray-400 hover:text-white transition-colors text-sm"
+              className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
             >
               Dashboard
             </button>
-            <span className="text-gray-600">|</span>
-            <span className="text-white text-sm">{user?.username}</span>
+            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
+            <span className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-gray-900'} text-sm`}>
+              {user?.profileImage ? (
+                <img
+                  src={user.profileImage}
+                  alt=""
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <div className={`w-6 h-6 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
+                  <svg className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
+              {user?.username}
+            </span>
             <button
               onClick={handleLogout}
-              className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+              className={`${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg transition-colors text-sm`}
             >
               Logout
             </button>
@@ -187,7 +276,7 @@ const Profile = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-white p-2"
+            className={`md:hidden ${isDark ? 'text-white' : 'text-gray-900'} p-2`}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileMenuOpen ? (
@@ -201,25 +290,36 @@ const Profile = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-gray-900 border-t border-gray-800 px-4 py-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-white text-sm">{user?.username}</span>
+          <div className={`md:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-t px-4 py-3 space-y-3`}>
+            <div className="flex items-center gap-2">
+              {user?.profileImage ? (
+                <img
+                  src={user.profileImage}
+                  alt=""
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
+              <span className={`${isDark ? 'text-white' : 'text-gray-900'} text-sm`}>{user?.username}</span>
             </div>
             <button
               onClick={() => { navigate('/simulation'); setMobileMenuOpen(false); }}
-              className="block w-full text-left text-gray-400 hover:text-white py-2 text-sm"
+              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
             >
               Simulation
             </button>
             <button
               onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
-              className="block w-full text-left text-gray-400 hover:text-white py-2 text-sm"
+              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
             >
               Dashboard
             </button>
             <button
               onClick={handleLogout}
-              className="block w-full bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm text-center"
+              className={`block w-full ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg text-sm text-center`}
             >
               Logout
             </button>
@@ -229,16 +329,16 @@ const Profile = () => {
 
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold text-white mb-6">Account Settings</h2>
+        <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-6`}>Account Settings</h2>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-800 mb-6">
+        <div className={`flex border-b ${isDark ? 'border-gray-800' : 'border-gray-200'} mb-6`}>
           <button
             onClick={() => setActiveTab('profile')}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === 'profile'
-                ? 'text-white border-b-2 border-white'
-                : 'text-gray-400 hover:text-white'
+                ? isDark ? 'text-white border-b-2 border-white' : 'text-gray-900 border-b-2 border-gray-900'
+                : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             Profile
@@ -247,8 +347,8 @@ const Profile = () => {
             onClick={() => setActiveTab('password')}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === 'password'
-                ? 'text-white border-b-2 border-white'
-                : 'text-gray-400 hover:text-white'
+                ? isDark ? 'text-white border-b-2 border-white' : 'text-gray-900 border-b-2 border-gray-900'
+                : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             Password
@@ -258,10 +358,72 @@ const Profile = () => {
         {/* Profile Tab */}
         {activeTab === 'profile' && (
           <form onSubmit={handleProfileSubmit} className="space-y-5">
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 space-y-5">
+            {/* Profile Picture Section */}
+            <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border p-6 transition-colors duration-300`}>
+              <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-4`}>
+                Profile Picture
+              </label>
+              <div className="flex items-center gap-6">
+                {/* Avatar */}
+                <div className="relative">
+                  <div className={`w-24 h-24 rounded-full overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-300'} border-2`}>
+                    {user?.profileImage ? (
+                      <img
+                        src={user.profileImage}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500">
+                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {isUploadingPicture && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-white"></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload/Remove Buttons */}
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePictureSelect}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingPicture}
+                    className="bg-white hover:bg-gray-200 text-black px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {user?.profileImage ? 'Change Photo' : 'Upload Photo'}
+                  </button>
+                  {user?.profileImage && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePicture}
+                      disabled={isUploadingPicture}
+                      className="text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF. Max 5MB</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border p-6 space-y-5 transition-colors duration-300`}>
               {/* Username */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Username
                 </label>
                 <input
@@ -269,14 +431,14 @@ const Profile = () => {
                   name="username"
                   value={profileForm.username}
                   onChange={handleProfileChange}
-                  className="w-full bg-black border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-500 text-sm"
+                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
                   placeholder="Enter username"
                 />
               </div>
 
               {/* First Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   First Name
                 </label>
                 <input
@@ -284,14 +446,14 @@ const Profile = () => {
                   name="firstName"
                   value={profileForm.firstName}
                   onChange={handleProfileChange}
-                  className="w-full bg-black border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-500 text-sm"
+                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
                   placeholder="Enter first name"
                 />
               </div>
 
               {/* Last Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Last Name
                 </label>
                 <input
@@ -299,14 +461,14 @@ const Profile = () => {
                   name="lastName"
                   value={profileForm.lastName}
                   onChange={handleProfileChange}
-                  className="w-full bg-black border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-500 text-sm"
+                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
                   placeholder="Enter last name"
                 />
               </div>
 
               {/* Email (Read-only) */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Email
                 </label>
                 <input
@@ -314,9 +476,9 @@ const Profile = () => {
                   name="email"
                   value={profileForm.email}
                   disabled
-                  className="w-full bg-gray-800 border border-gray-700 text-gray-400 px-4 py-3 rounded-lg text-sm cursor-not-allowed"
+                  className={`w-full ${isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-500'} border px-4 py-3 rounded-lg text-sm cursor-not-allowed`}
                 />
-                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-1`}>Email cannot be changed</p>
               </div>
             </div>
 
@@ -325,8 +487,8 @@ const Profile = () => {
               disabled={isLoading}
               className={`w-full py-3 rounded-lg font-medium text-sm transition-colors ${
                 isLoading
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-white text-black hover:bg-gray-200'
+                  ? isDark ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
               }`}
             >
               {isLoading ? 'Saving...' : 'Save Changes'}
@@ -337,10 +499,10 @@ const Profile = () => {
         {/* Password Tab */}
         {activeTab === 'password' && (
           <form onSubmit={handlePasswordSubmit} className="space-y-5">
-            <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 space-y-5">
+            <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border p-6 space-y-5 transition-colors duration-300`}>
               {/* Current Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Current Password
                 </label>
                 <input
@@ -348,7 +510,7 @@ const Profile = () => {
                   name="currentPassword"
                   value={passwordForm.currentPassword}
                   onChange={handlePasswordChange}
-                  className="w-full bg-black border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-500 text-sm"
+                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
                   placeholder="Enter current password"
                   required
                 />
@@ -356,7 +518,7 @@ const Profile = () => {
 
               {/* New Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   New Password
                 </label>
                 <input
@@ -364,18 +526,18 @@ const Profile = () => {
                   name="newPassword"
                   value={passwordForm.newPassword}
                   onChange={handlePasswordChange}
-                  className="w-full bg-black border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-500 text-sm"
+                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
                   placeholder="Enter new password"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
                   Must be at least 6 characters with uppercase, lowercase, and number
                 </p>
               </div>
 
               {/* Confirm Password */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Confirm New Password
                 </label>
                 <input
@@ -383,7 +545,7 @@ const Profile = () => {
                   name="confirmPassword"
                   value={passwordForm.confirmPassword}
                   onChange={handlePasswordChange}
-                  className="w-full bg-black border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-gray-500 text-sm"
+                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
                   placeholder="Confirm new password"
                   required
                 />
@@ -395,8 +557,8 @@ const Profile = () => {
               disabled={isLoading}
               className={`w-full py-3 rounded-lg font-medium text-sm transition-colors ${
                 isLoading
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-white text-black hover:bg-gray-200'
+                  ? isDark ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
               }`}
             >
               {isLoading ? 'Changing...' : 'Change Password'}
@@ -404,12 +566,51 @@ const Profile = () => {
           </form>
         )}
 
+        {/* Theme Settings */}
+        <div className={`mt-8 p-4 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border transition-colors duration-300`}>
+          <h3 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-4`}>Appearance</h3>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-sm font-medium`}>Theme</p>
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>Choose your preferred color scheme</p>
+            </div>
+            <div className={`flex items-center gap-2 ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg p-1`}>
+              <button
+                onClick={() => !isDark && toggleTheme()}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  isDark
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+                Dark
+              </button>
+              <button
+                onClick={() => isDark && toggleTheme()}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  !isDark
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                Light
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Account Info */}
-        <div className="mt-8 p-4 bg-gray-900 rounded-lg border border-gray-800">
-          <h3 className="text-sm font-medium text-gray-300 mb-3">Account Info</h3>
-          <div className="space-y-2 text-xs text-gray-400">
-            <p>Member since: <span className="text-white">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span></p>
-            <p>Account ID: <span className="text-white font-mono">{user?.id?.slice(0, 8) || 'N/A'}...</span></p>
+        <div className={`mt-4 p-4 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border transition-colors duration-300`}>
+          <h3 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Account Info</h3>
+          <div className={`space-y-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p>Member since: <span className={isDark ? 'text-white' : 'text-gray-900'}>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span></p>
+            <p>Account ID: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-mono`}>{user?.id?.slice(0, 8) || 'N/A'}...</span></p>
           </div>
         </div>
       </main>

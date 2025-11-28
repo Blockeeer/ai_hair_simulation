@@ -8,7 +8,11 @@ const {
   changePassword,
   googleAuth,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyEmail,
+  resendVerification,
+  uploadProfilePicture,
+  removeProfilePicture
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const {
@@ -26,10 +30,14 @@ router.post('/login', loginValidation, login);
 router.post('/google', googleAuth);
 router.post('/forgot-password', forgotPasswordValidation, forgotPassword);
 router.post('/reset-password', resetPasswordValidation, resetPassword);
+router.post('/verify-email', verifyEmail);
 
 // Protected routes
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfileValidation, updateProfile);
 router.put('/password', protect, changePasswordValidation, changePassword);
+router.post('/resend-verification', protect, resendVerification);
+router.put('/profile-picture', protect, uploadProfilePicture);
+router.delete('/profile-picture', protect, removeProfilePicture);
 
 module.exports = router;

@@ -120,6 +120,49 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const resendVerification = async () => {
+    try {
+      const response = await api.post('/auth/resend-verification');
+      return response.data;
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      throw error;
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const response = await api.get('/auth/me');
+      setUser(response.data.user);
+      return response.data.user;
+    } catch (error) {
+      console.error('Refresh user error:', error);
+      throw error;
+    }
+  };
+
+  const updateProfilePicture = async (imageData) => {
+    try {
+      const response = await api.put('/auth/profile-picture', { image: imageData });
+      setUser(response.data.user);
+      return response.data;
+    } catch (error) {
+      console.error('Update profile picture error:', error);
+      throw error;
+    }
+  };
+
+  const removeProfilePicture = async () => {
+    try {
+      const response = await api.delete('/auth/profile-picture');
+      setUser(response.data.user);
+      return response.data;
+    } catch (error) {
+      console.error('Remove profile picture error:', error);
+      throw error;
+    }
+  };
+
   const value = {
     user,
     isAuthenticated,
@@ -130,7 +173,11 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     changePassword,
-    googleAuth
+    googleAuth,
+    resendVerification,
+    refreshUser,
+    updateProfilePicture,
+    removeProfilePicture
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

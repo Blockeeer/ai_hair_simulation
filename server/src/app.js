@@ -5,9 +5,30 @@ const path = require('path');
 
 const app = express();
 
-// Middleware
+// CORS configuration - allow localhost and production
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Allow any localhost port (for development)
+    if (origin.match(/^http:\/\/localhost:\d+$/)) {
+      return callback(null, true);
+    }
+
+    // Allow production URL
+    if (origin === 'https://ai-hair-simulation-frontend.onrender.com') {
+      return callback(null, true);
+    }
+
+    // Allow CLIENT_URL from env
+    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
+      return callback(null, true);
+    }
+
+    console.warn(`CORS blocked origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
