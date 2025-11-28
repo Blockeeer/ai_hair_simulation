@@ -10,7 +10,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
-import Simulation from './pages/Simulation.jsx';
+import Simulation from './pages/simulation.jsx';
 import Profile from './pages/Profile';
 
 // Google Client ID - Get this from Google Cloud Console
