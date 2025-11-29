@@ -154,19 +154,40 @@ const trialGenerate = async (req, res) => {
       console.log('Generating trial simulation with Gemini, options:', options);
       result = await geminiService.changeHaircut(imageBase64, options);
     } else {
-      // Replicate style mapping
+      // Replicate style mapping - exact options from flux-kontext-apps/change-haircut API
       const replicateStyleMap = {
-        'buzz-cut': 'Buzz Cut',
-        'fade': 'Fade',
-        'pompadour': 'Pompadour',
+        // Male styles
+        'crew-cut': 'Crew Cut',
+        'undercut': 'Undercut',
+        'mohawk': 'Mohawk',
+        'faux-hawk': 'Faux Hawk',
+        'slicked-back': 'Slicked Back',
+        // Female styles
+        'bob': 'Bob',
+        'pixie-cut': 'Pixie Cut',
+        'wavy': 'Wavy',
+        'layered': 'Layered',
+        'lob': 'Lob',
+        // Shared styles
         'curly': 'Curly',
-        'long-straight': 'Long and Straight',
-        'bob': 'Bob'
+        'straight': 'Straight'
+      };
+
+      // Replicate hair color mapping
+      const replicateColorMap = {
+        'no-change': 'No change',
+        'random': 'Random',
+        'blonde': 'Blonde',
+        'brunette': 'Brunette',
+        'black': 'Black',
+        'red': 'Red',
+        'platinum-blonde': 'Platinum Blonde',
+        'auburn': 'Auburn'
       };
 
       const options = {
         haircut: replicateStyleMap[style] || 'Random',
-        hair_color: 'Random',
+        hair_color: replicateColorMap[hairColor] || 'Random',
         gender: 'none'
       };
 
