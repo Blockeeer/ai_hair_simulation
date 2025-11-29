@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import LoginModal from '../components/LoginModal';
+import RegisterModal from '../components/RegisterModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -13,6 +15,10 @@ const Landing = () => {
   const [generatedImage, setGeneratedImage] = useState(null);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+
+  // Modal states
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
   // Trial count from localStorage
   const getTrialCount = () => {
@@ -85,6 +91,22 @@ const Landing = () => {
     }
   };
 
+  // Modal handlers
+  const openLoginModal = () => {
+    setShowRegisterModal(false);
+    setShowLoginModal(true);
+  };
+
+  const openRegisterModal = () => {
+    setShowLoginModal(false);
+    setShowRegisterModal(true);
+  };
+
+  const handleForgotPassword = () => {
+    setShowLoginModal(false);
+    navigate('/forgot-password');
+  };
+
   const features = [
     {
       icon: (
@@ -118,7 +140,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-gray-800">
+      <nav className="fixed top-0 left-0 right-0 z-40 bg-black/80 backdrop-blur-md border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-2">
@@ -130,18 +152,18 @@ const Landing = () => {
               <span className="text-xl font-bold">AI Hair Simulation</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                to="/login"
+              <button
+                onClick={openLoginModal}
                 className="text-gray-300 hover:text-white transition-colors px-4 py-2"
               >
                 Sign In
-              </Link>
-              <Link
-                to="/register"
+              </button>
+              <button
+                onClick={openRegisterModal}
                 className="bg-white text-black px-4 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors"
               >
                 Get Started
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -163,12 +185,12 @@ const Landing = () => {
             >
               Try It Free
             </a>
-            <Link
-              to="/register"
+            <button
+              onClick={openRegisterModal}
               className="border border-gray-700 text-white px-8 py-4 rounded-lg font-medium text-lg hover:bg-gray-900 transition-colors"
             >
               Create Account
-            </Link>
+            </button>
           </div>
           <p className="mt-4 text-gray-500 text-sm">
             {remainingTrials > 0
@@ -212,9 +234,12 @@ const Landing = () => {
             <div className="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-lg mb-6 text-center">
               {error}
               {remainingTrials <= 0 && (
-                <Link to="/register" className="ml-2 underline hover:text-red-200">
+                <button
+                  onClick={openRegisterModal}
+                  className="ml-2 underline hover:text-red-200"
+                >
                   Sign up now
-                </Link>
+                </button>
               )}
             </div>
           )}
@@ -317,12 +342,12 @@ const Landing = () => {
                   <p className="text-gray-400 text-sm mb-4">
                     Like what you see? Sign up for unlimited generations!
                   </p>
-                  <Link
-                    to="/register"
+                  <button
+                    onClick={openRegisterModal}
                     className="inline-block bg-white text-black px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                   >
                     Create Free Account
-                  </Link>
+                  </button>
                 </div>
               )}
             </div>
@@ -337,12 +362,12 @@ const Landing = () => {
           <p className="text-gray-400 text-lg mb-8">
             Join thousands of users who have discovered their perfect hairstyle
           </p>
-          <Link
-            to="/register"
+          <button
+            onClick={openRegisterModal}
             className="inline-block bg-white text-black px-8 py-4 rounded-lg font-medium text-lg hover:bg-gray-200 transition-colors"
           >
             Get Started Free
-          </Link>
+          </button>
         </div>
       </section>
 
@@ -352,6 +377,21 @@ const Landing = () => {
           <p>&copy; 2024 AI Hair Simulation. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSwitchToRegister={openRegisterModal}
+        onForgotPassword={handleForgotPassword}
+      />
+
+      {/* Register Modal */}
+      <RegisterModal
+        isOpen={showRegisterModal}
+        onClose={() => setShowRegisterModal(false)}
+        onSwitchToLogin={openLoginModal}
+      />
     </div>
   );
 };
