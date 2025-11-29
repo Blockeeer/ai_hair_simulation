@@ -30,10 +30,19 @@ const Simulation = () => {
   // Generation limit
   const [generationLimit, setGenerationLimit] = useState({ generationCount: 0, limit: 5, remaining: 5 });
 
+  // AI Model selection
+  const [aiModel, setAiModel] = useState('replicate');
+
   // Replicate options
   const [haircut, setHaircut] = useState('Random');
   const [hairColor, setHairColor] = useState('Random');
   const [gender, setGender] = useState('none');
+
+  // AI Model options
+  const aiModelOptions = [
+    { value: 'replicate', label: 'Replicate (Default)', description: 'Fast and reliable' },
+    { value: 'gemini', label: 'Google Gemini', description: 'Advanced AI generation' }
+  ];
 
   // Exact options from Replicate API (flux-kontext-apps/change-haircut) - organized by category
   const haircutCategories = {
@@ -75,6 +84,109 @@ const Simulation = () => {
     'Silver', 'White', 'Blue', 'Purple', 'Pink', 'Green', 'Blue-Black', 'Golden Blonde',
     'Honey Blonde', 'Caramel', 'Chestnut', 'Mahogany', 'Burgundy', 'Jet Black',
     'Ash Brown', 'Ash Blonde', 'Titanium', 'Rose Gold'
+  ];
+
+  // Gemini-specific hairstyle options (more natural descriptions for prompt)
+  const geminiHaircutOptions = [
+    // Unisex styles
+    'natural waves',
+    'sleek straight hair',
+    'voluminous curls',
+    'beach waves',
+    'tight curls',
+    'messy textured hair',
+    'slicked back hair',
+    'side-parted hair',
+    'middle-parted hair',
+    'afro',
+    'dreadlocks',
+    // Men's styles
+    'buzz cut',
+    'crew cut',
+    'fade haircut',
+    'high fade',
+    'low fade',
+    'mid fade',
+    'skin fade',
+    'taper fade',
+    'undercut',
+    'disconnected undercut',
+    'mohawk',
+    'faux hawk',
+    'pompadour',
+    'modern pompadour',
+    'quiff',
+    'textured quiff',
+    'slick back undercut',
+    'comb over',
+    'hard part',
+    'side part',
+    'french crop',
+    'textured crop',
+    'caesar cut',
+    'ivy league',
+    'man bun',
+    'top knot for men',
+    'curtain bangs for men',
+    'edgar cut',
+    'mullet',
+    'modern mullet',
+    'spiky hair',
+    'messy fringe',
+    'textured fringe',
+    'short and spiky',
+    'long on top short sides',
+    'business professional cut',
+    // Women's styles
+    'bob cut',
+    'pixie cut',
+    'long layered hair',
+    'short cropped hair',
+    'shaggy layers',
+    'blunt cut',
+    'feathered layers',
+    'high ponytail',
+    'low bun',
+    'braided hair',
+    'long straight hair',
+    'shoulder length waves',
+    'lob haircut',
+    'asymmetrical bob',
+    'bangs with long hair',
+    'curtain bangs',
+    'side swept bangs',
+    'half up half down'
+  ];
+
+  // Gemini-specific hair color options
+  const geminiHairColorOptions = [
+    'natural',
+    'blonde',
+    'brunette',
+    'black',
+    'dark brown',
+    'light brown',
+    'auburn',
+    'red',
+    'strawberry blonde',
+    'platinum blonde',
+    'silver',
+    'gray',
+    'copper',
+    'honey blonde',
+    'caramel',
+    'chestnut',
+    'burgundy',
+    'jet black',
+    'ash blonde',
+    'rose gold',
+    'pastel pink',
+    'pastel blue',
+    'pastel purple',
+    'vibrant red',
+    'ombre blonde to brown',
+    'ombre brown to blonde',
+    'balayage highlights'
   ];
 
   // Gender options - API requires lowercase values
@@ -195,6 +307,7 @@ const Simulation = () => {
   };
 
   const handleReset = () => {
+    setAiModel('replicate');
     setHaircut('Random');
     setHairColor('Random');
     setGender('none');
@@ -216,7 +329,8 @@ const Simulation = () => {
         imageBase64: uploadedImage,
         haircut: haircut,
         hair_color: hairColor,
-        gender: gender
+        gender: gender,
+        model: aiModel
       });
 
       if (response.data.success) {
@@ -668,36 +782,78 @@ const Simulation = () => {
           <h2 className={`text-base md:text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-4 md:mb-6`}>Settings</h2>
 
           <div className="space-y-4 md:space-y-5">
+            {/* AI Model Selection */}
+            <div>
+              <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
+                AI Model
+              </label>
+              <select
+                value={aiModel}
+                onChange={(e) => {
+                  setAiModel(e.target.value);
+                  // Reset options when switching models
+                  if (e.target.value === 'gemini') {
+                    setHaircut('natural waves');
+                    setHairColor('natural');
+                  } else {
+                    setHaircut('Random');
+                    setHairColor('Random');
+                  }
+                }}
+                className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
+              >
+                {aiModelOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <p className={`mt-1 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                {aiModelOptions.find(m => m.value === aiModel)?.description}
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className={`h-px ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}></div>
+
             {/* Dropdowns in a grid on mobile */}
-            <div className="grid grid-cols-3 lg:grid-cols-1 gap-3 md:gap-4 lg:gap-5">
+            <div className={`grid ${aiModel === 'gemini' ? 'grid-cols-2' : 'grid-cols-3'} lg:grid-cols-1 gap-3 md:gap-4 lg:gap-5`}>
               {/* Haircut Dropdown */}
               <div>
                 <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
-                  Haircut
+                  Hairstyle
                 </label>
                 <select
                   value={haircut}
                   onChange={(e) => setHaircut(e.target.value)}
                   className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
                 >
-                  {haircutCategories.general.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                  <optgroup label="Male Styles">
-                    {haircutCategories.male.map((option) => (
+                  {aiModel === 'gemini' ? (
+                    // Gemini hairstyle options
+                    geminiHaircutOptions.map((option) => (
                       <option key={option} value={option}>{option}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Female Styles">
-                    {haircutCategories.female.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Unisex Styles">
-                    {haircutCategories.unisex.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </optgroup>
+                    ))
+                  ) : (
+                    // Replicate hairstyle options
+                    <>
+                      {haircutCategories.general.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                      <optgroup label="Male Styles">
+                        {haircutCategories.male.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Female Styles">
+                        {haircutCategories.female.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Unisex Styles">
+                        {haircutCategories.unisex.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </optgroup>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -711,27 +867,37 @@ const Simulation = () => {
                   onChange={(e) => setHairColor(e.target.value)}
                   className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
                 >
-                  {hairColorOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
+                  {aiModel === 'gemini' ? (
+                    // Gemini hair color options
+                    geminiHairColorOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))
+                  ) : (
+                    // Replicate hair color options
+                    hairColorOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))
+                  )}
                 </select>
               </div>
 
-              {/* Gender Dropdown */}
-              <div>
-                <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
-                  Gender
-                </label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
-                >
-                  {genderOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
+              {/* Gender Dropdown - Only show for Replicate */}
+              {aiModel === 'replicate' && (
+                <div>
+                  <label className={`block text-xs md:text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-1.5 md:mb-2`}>
+                    Gender
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                    className={`w-full ${isDark ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-2 md:px-3 py-2 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-600' : 'focus:border-gray-400'} text-xs md:text-sm`}
+                  >
+                    {genderOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Divider - Hidden on mobile */}
@@ -782,9 +948,12 @@ const Simulation = () => {
             <div className={`hidden lg:block mt-6 p-4 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} rounded-lg border`}>
               <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2`}>Current Selection:</p>
               <div className="space-y-1 text-xs">
-                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Haircut: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{haircut}</span></p>
+                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Model: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{aiModelOptions.find(m => m.value === aiModel)?.label}</span></p>
+                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Hairstyle: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{haircut}</span></p>
                 <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Color: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{hairColor}</span></p>
-                <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Gender: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{genderOptions.find(g => g.value === gender)?.label || gender}</span></p>
+                {aiModel === 'replicate' && (
+                  <p className={isDark ? 'text-gray-300' : 'text-gray-600'}>Gender: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{genderOptions.find(g => g.value === gender)?.label || gender}</span></p>
+                )}
               </div>
             </div>
           </div>

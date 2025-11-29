@@ -1,4 +1,5 @@
 const aiService = require('../services/aiService');
+const geminiService = require('../services/geminiService');
 const queueService = require('../services/queueService');
 const crypto = require('crypto');
 const userService = require('../services/userService');
@@ -12,7 +13,7 @@ const generateSimulation = async (req, res) => {
   const jobId = crypto.randomUUID();
 
   try {
-    const { imageBase64, haircut, hair_color, gender } = req.body;
+    const { imageBase64, haircut, hair_color, gender, model } = req.body;
     const userId = req.user?.id;
 
     if (!imageBase64) {
@@ -42,17 +43,30 @@ const generateSimulation = async (req, res) => {
     const queueInfo = queueService.addJob(jobId, userId || 'anonymous');
     console.log('Job ' + jobId + ' added to queue. Position: ' + queueInfo.position + ', Est. wait: ' + queueInfo.estimatedWaitTime + 's');
 
-    // Set defaults if not provided (must match Replicate API accepted values)
-    const options = {
-      haircut: haircut || 'Random',
-      hair_color: hair_color || 'Random',
-      gender: gender || 'none'
-    };
+    // Determine which model to use (default to replicate)
+    const selectedModel = model || 'replicate';
+    console.log('Using AI model:', selectedModel);
 
-    console.log('Generating simulation with options:', options);
+    let result;
 
-    // Call AI Service (Replicate)
-    const result = await aiService.changeHaircut(imageBase64, options);
+    if (selectedModel === 'gemini') {
+      // Use Gemini AI
+      const options = {
+        haircut: haircut || 'natural waves',
+        hair_color: hair_color || 'natural'
+      };
+      console.log('Generating simulation with Gemini, options:', options);
+      result = await geminiService.changeHaircut(imageBase64, options);
+    } else {
+      // Use Replicate (default)
+      const options = {
+        haircut: haircut || 'Random',
+        hair_color: hair_color || 'Random',
+        gender: gender || 'none'
+      };
+      console.log('Generating simulation with Replicate, options:', options);
+      result = await aiService.changeHaircut(imageBase64, options);
+    }
 
     // Remove job from queue (success)
     queueService.removeJob(jobId, true);
@@ -68,7 +82,8 @@ const generateSimulation = async (req, res) => {
       data: {
         originalImage: imageBase64,
         resultImage: result,
-        options: options
+        model: selectedModel,
+        options: { haircut, hair_color, gender }
       }
     });
   } catch (error) {
