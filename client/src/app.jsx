@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -23,22 +24,15 @@ function App() {
         <Router>
           <AuthProvider>
           <Routes>
+          {/* Landing page - public */}
+          <Route path="/" element={<Landing />} />
+
           {/* Public routes - redirect to dashboard if already logged in */}
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
-
-          {/* Protected routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/dashboard"
             element={

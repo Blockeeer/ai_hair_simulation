@@ -27,6 +27,9 @@ const Simulation = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const elapsedTimerRef = useRef(null);
 
+  // Generation limit
+  const [generationLimit, setGenerationLimit] = useState({ generationCount: 0, limit: 5, remaining: 5 });
+
   // Replicate options
   const [haircut, setHaircut] = useState('Random');
   const [hairColor, setHairColor] = useState('Random');

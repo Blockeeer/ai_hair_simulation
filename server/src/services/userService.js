@@ -127,6 +127,33 @@ class UserService {
     return await this.findById(userId);
   }
 
+  async getUserById(userId) {
+    return await this.findById(userId);
+  }
+
+  async incrementGenerationCount(userId) {
+    const user = await this.findById(userId);
+    const currentCount = user?.generationCount || 0;
+    const lastGenerationDate = user?.lastGenerationDate;
+    const today = new Date().toDateString();
+
+    // Reset count if it's a new day
+    if (lastGenerationDate !== today) {
+      await this.usersCollection.doc(userId).update({
+        generationCount: 1,
+        lastGenerationDate: today
+      });
+      return 1;
+    }
+
+    // Increment count
+    const newCount = currentCount + 1;
+    await this.usersCollection.doc(userId).update({
+      generationCount: newCount
+    });
+    return newCount;
+  }
+
   // Create or get user from Google OAuth
   async findOrCreateGoogleUser(googleUserData) {
     const { email, name, picture, sub: googleId } = googleUserData;
