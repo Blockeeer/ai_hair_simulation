@@ -111,7 +111,7 @@ const trialGenerate = async (req, res) => {
       });
     }
 
-    const { style } = req.body;
+    const { style, model, hairColor } = req.body;
 
     if (!style) {
       return res.status(400).json({
@@ -123,30 +123,56 @@ const trialGenerate = async (req, res) => {
     // Convert uploaded image to base64
     const imageBase64 = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
 
-    // Map style ID to haircut name
-    const styleMap = {
-      'buzz-cut': 'Buzz Cut',
-      'fade': 'Fade',
-      'pompadour': 'Pompadour',
-      'curly': 'Curly',
-      'long-straight': 'Long and Straight',
-      'bob': 'Bob'
-    };
-
-    const options = {
-      haircut: styleMap[style] || 'Random',
-      hair_color: 'Random',
-      gender: 'none'
-    };
+    // Determine which model to use (default to replicate)
+    const selectedModel = model || 'replicate';
+    console.log('Trial using AI model:', selectedModel);
 
     // Add job to queue
     const queueInfo = queueService.addJob(jobId, 'trial-user');
     console.log('Trial job ' + jobId + ' added to queue. Position: ' + queueInfo.position);
 
-    console.log('Generating trial simulation with options:', options);
+    let result;
 
-    // Call AI Service
-    const result = await aiService.changeHaircut(imageBase64, options);
+    if (selectedModel === 'gemini') {
+      // Gemini style mapping
+      const geminiStyleMap = {
+        'natural-waves': 'natural waves',
+        'buzz-cut': 'buzz cut',
+        'fade': 'fade haircut',
+        'pompadour': 'pompadour',
+        'undercut': 'undercut',
+        'bob-cut': 'bob cut',
+        'pixie-cut': 'pixie cut',
+        'quiff': 'quiff'
+      };
+
+      const options = {
+        haircut: geminiStyleMap[style] || style.replace(/-/g, ' '),
+        hair_color: hairColor || 'natural'
+      };
+
+      console.log('Generating trial simulation with Gemini, options:', options);
+      result = await geminiService.changeHaircut(imageBase64, options);
+    } else {
+      // Replicate style mapping
+      const replicateStyleMap = {
+        'buzz-cut': 'Buzz Cut',
+        'fade': 'Fade',
+        'pompadour': 'Pompadour',
+        'curly': 'Curly',
+        'long-straight': 'Long and Straight',
+        'bob': 'Bob'
+      };
+
+      const options = {
+        haircut: replicateStyleMap[style] || 'Random',
+        hair_color: 'Random',
+        gender: 'none'
+      };
+
+      console.log('Generating trial simulation with Replicate, options:', options);
+      result = await aiService.changeHaircut(imageBase64, options);
+    }
 
     // Remove job from queue (success)
     queueService.removeJob(jobId, true);
@@ -155,7 +181,8 @@ const trialGenerate = async (req, res) => {
       success: true,
       message: 'Trial simulation generated successfully',
       data: {
-        generatedImageUrl: result
+        generatedImageUrl: result,
+        model: selectedModel
       }
     });
   } catch (error) {

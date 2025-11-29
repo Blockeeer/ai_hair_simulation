@@ -11,6 +11,8 @@ const Landing = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [selectedStyle, setSelectedStyle] = useState('');
+  const [selectedModel, setSelectedModel] = useState('replicate');
+  const [selectedHairColor, setSelectedHairColor] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   const [error, setError] = useState('');
@@ -33,7 +35,14 @@ const Landing = () => {
 
   const remainingTrials = 2 - getTrialCount();
 
-  const hairStyles = [
+  // AI Model options
+  const modelOptions = [
+    { value: 'replicate', label: 'Replicate', description: 'Fast and reliable' },
+    { value: 'gemini', label: 'Google Gemini', description: 'Advanced AI' }
+  ];
+
+  // Replicate hairstyles
+  const replicateStyles = [
     { id: 'buzz-cut', name: 'Buzz Cut', description: 'Short and clean' },
     { id: 'fade', name: 'Fade', description: 'Gradient style' },
     { id: 'pompadour', name: 'Pompadour', description: 'Classic volume' },
@@ -41,6 +50,31 @@ const Landing = () => {
     { id: 'long-straight', name: 'Long Straight', description: 'Sleek and long' },
     { id: 'bob', name: 'Bob Cut', description: 'Modern bob' },
   ];
+
+  // Gemini hairstyles
+  const geminiStyles = [
+    { id: 'natural-waves', name: 'Natural Waves', description: 'Soft and flowing' },
+    { id: 'buzz-cut', name: 'Buzz Cut', description: 'Short and clean' },
+    { id: 'fade', name: 'Fade Haircut', description: 'Gradient style' },
+    { id: 'pompadour', name: 'Pompadour', description: 'Classic volume' },
+    { id: 'undercut', name: 'Undercut', description: 'Modern and edgy' },
+    { id: 'bob-cut', name: 'Bob Cut', description: 'Modern bob' },
+    { id: 'pixie-cut', name: 'Pixie Cut', description: 'Short and chic' },
+    { id: 'quiff', name: 'Quiff', description: 'Textured top' },
+  ];
+
+  // Gemini hair colors
+  const geminiHairColors = [
+    { id: 'natural', name: 'Natural', description: 'Keep original' },
+    { id: 'blonde', name: 'Blonde', description: 'Light and bright' },
+    { id: 'brunette', name: 'Brunette', description: 'Rich brown' },
+    { id: 'black', name: 'Black', description: 'Deep and dark' },
+    { id: 'red', name: 'Red', description: 'Vibrant red' },
+    { id: 'platinum-blonde', name: 'Platinum', description: 'Icy blonde' },
+  ];
+
+  // Get current hairstyles based on selected model
+  const hairStyles = selectedModel === 'gemini' ? geminiStyles : replicateStyles;
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
@@ -67,6 +101,12 @@ const Landing = () => {
       return;
     }
 
+    // For Gemini, require hair color selection
+    if (selectedModel === 'gemini' && !selectedHairColor) {
+      setError('Please select a hair color');
+      return;
+    }
+
     setIsGenerating(true);
     setError('');
 
@@ -74,7 +114,12 @@ const Landing = () => {
       const formData = new FormData();
       formData.append('image', selectedImage);
       formData.append('style', selectedStyle);
+      formData.append('model', selectedModel);
       formData.append('isTrial', 'true');
+
+      if (selectedModel === 'gemini' && selectedHairColor) {
+        formData.append('hairColor', selectedHairColor);
+      }
 
       const response = await axios.post(`${API_URL}/simulation/trial-generate`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -279,7 +324,33 @@ const Landing = () => {
                 disabled={remainingTrials <= 0}
               />
 
-              <h3 className="text-lg font-semibold mt-6 mb-4">2. Select a Hairstyle</h3>
+              {/* AI Model Selection */}
+              <h3 className="text-lg font-semibold mt-6 mb-3">2. Choose AI Model</h3>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {modelOptions.map((model) => (
+                  <button
+                    key={model.value}
+                    onClick={() => {
+                      if (remainingTrials > 0) {
+                        setSelectedModel(model.value);
+                        setSelectedStyle(''); // Reset style when switching model
+                        setSelectedHairColor(''); // Reset color when switching model
+                      }
+                    }}
+                    disabled={remainingTrials <= 0}
+                    className={`p-3 rounded-lg border text-left transition-colors ${
+                      selectedModel === model.value
+                        ? 'border-white bg-white/10'
+                        : 'border-gray-700 hover:border-gray-600'
+                    } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <p className="font-medium text-sm">{model.label}</p>
+                    <p className="text-gray-500 text-xs">{model.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              <h3 className="text-lg font-semibold mt-4 mb-3">3. Select a Hairstyle</h3>
               <div className="grid grid-cols-2 gap-3">
                 {hairStyles.map((style) => (
                   <button
@@ -298,16 +369,39 @@ const Landing = () => {
                 ))}
               </div>
 
+              {/* Hair Color Selection - Only for Gemini */}
+              {selectedModel === 'gemini' && (
+                <>
+                  <h3 className="text-lg font-semibold mt-4 mb-3">4. Select Hair Color</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {geminiHairColors.map((color) => (
+                      <button
+                        key={color.id}
+                        onClick={() => remainingTrials > 0 && setSelectedHairColor(color.id)}
+                        disabled={remainingTrials <= 0}
+                        className={`p-2 rounded-lg border text-center transition-colors ${
+                          selectedHairColor === color.id
+                            ? 'border-white bg-white/10'
+                            : 'border-gray-700 hover:border-gray-600'
+                        } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <p className="font-medium text-xs">{color.name}</p>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating || !selectedImage || !selectedStyle || remainingTrials <= 0}
+                disabled={isGenerating || !selectedImage || !selectedStyle || remainingTrials <= 0 || (selectedModel === 'gemini' && !selectedHairColor)}
                 className={`w-full mt-6 py-3 rounded-lg font-medium transition-colors ${
-                  isGenerating || !selectedImage || !selectedStyle || remainingTrials <= 0
+                  isGenerating || !selectedImage || !selectedStyle || remainingTrials <= 0 || (selectedModel === 'gemini' && !selectedHairColor)
                     ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
                     : 'bg-white text-black hover:bg-gray-200'
                 }`}
               >
-                {isGenerating ? 'Generating...' : 'Generate Hairstyle'}
+                {isGenerating ? 'Generating...' : `Generate with ${selectedModel === 'gemini' ? 'Gemini' : 'Replicate'}`}
               </button>
             </div>
 
