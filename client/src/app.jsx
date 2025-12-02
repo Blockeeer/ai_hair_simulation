@@ -5,13 +5,11 @@ import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
-import Simulation from './pages/simulation.jsx';
+import Simulation from './pages/Simulation.jsx';
 import Profile from './pages/Profile';
 
 // Google Client ID - Get this from Google Cloud Console
@@ -27,9 +25,11 @@ function App() {
           {/* Landing page - public */}
           <Route path="/" element={<Landing />} />
 
+          {/* Redirect old login/register routes to landing page */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/register" element={<Navigate to="/" replace />} />
+
           {/* Public routes - redirect to dashboard if already logged in */}
-          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />

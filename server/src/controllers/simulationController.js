@@ -5,8 +5,8 @@ const crypto = require('crypto');
 const userService = require('../services/userService');
 
 // Generation limits
-const TRIAL_LIMIT = 2;  // Non-logged-in users
-const USER_LIMIT = 5;   // Logged-in users (verified or not)
+const VERIFIED_USER_LIMIT = 5;   // Verified users get 5 free generations
+const UNVERIFIED_USER_LIMIT = 0; // Unverified users get 0 generations
 
 // Generate hair simulation
 const generateSimulation = async (req, res) => {
@@ -26,15 +26,30 @@ const generateSimulation = async (req, res) => {
     // Check generation limit for logged-in users
     if (userId) {
       const user = await userService.getUserById(userId);
+      const isVerified = user?.emailVerified || false;
       const generationCount = user?.generationCount || 0;
+      const userLimit = isVerified ? VERIFIED_USER_LIMIT : UNVERIFIED_USER_LIMIT;
 
-      if (generationCount >= USER_LIMIT) {
+      // Unverified users cannot generate at all
+      if (!isVerified) {
         return res.status(403).json({
           success: false,
-          message: `You have reached your daily limit of ${USER_LIMIT} generations. Please try again tomorrow.`,
+          message: 'Please verify your email to unlock 5 free generations.',
+          requiresVerification: true,
+          emailVerified: false,
+          generationCount: 0,
+          limit: VERIFIED_USER_LIMIT
+        });
+      }
+
+      // Check if verified user has reached their limit
+      if (generationCount >= userLimit) {
+        return res.status(403).json({
+          success: false,
+          message: `You have reached your limit of ${userLimit} free generations.`,
           limitReached: true,
           generationCount,
-          limit: USER_LIMIT
+          limit: userLimit
         });
       }
     }

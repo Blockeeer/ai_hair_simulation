@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import LoginModal from '../components/LoginModal';
 import RegisterModal from '../components/RegisterModal';
 
@@ -8,23 +8,24 @@ import RegisterModal from '../components/RegisterModal';
 import imgBefore from '../assets/img_before.jpg';
 import imgAfter from '../assets/img_after.png';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
 const Landing = () => {
   const navigate = useNavigate();
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [selectedStyle, setSelectedStyle] = useState('');
-  const [selectedModel, setSelectedModel] = useState('replicate');
-  const [selectedGender, setSelectedGender] = useState('male');
-  const [selectedHairColor, setSelectedHairColor] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState(null);
-  const [error, setError] = useState('');
-  const fileInputRef = useRef(null);
+  const { user, isAuthenticated } = useAuth();
 
   // Theme state
   const [isDark, setIsDark] = useState(true);
+
+  // Calculate generation limits for logged-in users
+  const getGenerationInfo = () => {
+    if (!user) return null;
+    const isVerified = user.emailVerified || false;
+    const count = user.generationCount || 0;
+    const limit = isVerified ? 5 : 0;
+    const remaining = Math.max(0, limit - count);
+    return { isVerified, count, limit, remaining };
+  };
+
+  const generationInfo = getGenerationInfo();
 
   // Before/After slider state
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -33,158 +34,6 @@ const Landing = () => {
   // Modal states
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-
-  // Trial count - unlimited for now (TODO: implement limitations later)
-  const remainingTrials = 999; // Unlimited trials
-
-  // AI Model options
-  const modelOptions = [
-    { value: 'replicate', label: 'Replicate', description: 'Fast and reliable' },
-    { value: 'gemini', label: 'Google Gemini', description: 'Advanced AI' }
-  ];
-
-  // Replicate hairstyles - exact options from flux-kontext-apps/change-haircut API
-  const replicateStyles = {
-    male: [
-      { id: 'crew-cut', name: 'Crew Cut', description: 'Short and clean' },
-      { id: 'undercut', name: 'Undercut', description: 'Modern edge' },
-      { id: 'mohawk', name: 'Mohawk', description: 'Bold statement' },
-      { id: 'faux-hawk', name: 'Faux Hawk', description: 'Subtle mohawk' },
-      { id: 'slicked-back', name: 'Slicked Back', description: 'Smooth and sleek' },
-      { id: 'curly', name: 'Curly', description: 'Natural curls' },
-    ],
-    female: [
-      { id: 'bob', name: 'Bob', description: 'Classic bob' },
-      { id: 'pixie-cut', name: 'Pixie Cut', description: 'Short and chic' },
-      { id: 'wavy', name: 'Wavy', description: 'Soft waves' },
-      { id: 'curly', name: 'Curly', description: 'Natural curls' },
-      { id: 'layered', name: 'Layered', description: 'Textured layers' },
-      { id: 'lob', name: 'Lob', description: 'Long bob' },
-    ]
-  };
-
-  // Gemini hairstyles - categorized by gender
-  const geminiStyles = {
-    male: [
-      { id: 'buzz-cut', name: 'Buzz Cut', description: 'Short and clean' },
-      { id: 'fade', name: 'Fade Haircut', description: 'Gradient style' },
-      { id: 'high-fade', name: 'High Fade', description: 'Bold gradient' },
-      { id: 'low-fade', name: 'Low Fade', description: 'Subtle gradient' },
-      { id: 'pompadour', name: 'Pompadour', description: 'Classic volume' },
-      { id: 'undercut', name: 'Undercut', description: 'Modern and edgy' },
-      { id: 'quiff', name: 'Quiff', description: 'Textured top' },
-      { id: 'crew-cut', name: 'Crew Cut', description: 'Military style' },
-      { id: 'french-crop', name: 'French Crop', description: 'Short textured' },
-      { id: 'caesar-cut', name: 'Caesar Cut', description: 'Classic Roman' },
-      { id: 'man-bun', name: 'Man Bun', description: 'Long tied back' },
-      { id: 'mullet', name: 'Mullet', description: 'Business in front' },
-      { id: 'spiky-hair', name: 'Spiky Hair', description: 'Edgy spikes' },
-      { id: 'slick-back', name: 'Slick Back', description: 'Smooth and sleek' },
-      { id: 'textured-fringe', name: 'Textured Fringe', description: 'Messy bangs' },
-      { id: 'curtain-hair', name: 'Curtain Hair', description: 'Middle parted' },
-    ],
-    female: [
-      { id: 'natural-waves', name: 'Natural Waves', description: 'Soft and flowing' },
-      { id: 'bob-cut', name: 'Bob Cut', description: 'Modern bob' },
-      { id: 'pixie-cut', name: 'Pixie Cut', description: 'Short and chic' },
-      { id: 'long-layered', name: 'Long Layered', description: 'Flowing layers' },
-      { id: 'lob', name: 'Lob (Long Bob)', description: 'Trendy length' },
-      { id: 'curtain-bangs', name: 'Curtain Bangs', description: 'Face framing' },
-      { id: 'beach-waves', name: 'Beach Waves', description: 'Effortless waves' },
-      { id: 'straight-sleek', name: 'Straight & Sleek', description: 'Smooth and shiny' },
-      { id: 'braided-hair', name: 'Braided Hair', description: 'Elegant braids' },
-      { id: 'ponytail', name: 'Ponytail', description: 'Classic tied back' },
-      { id: 'messy-bun', name: 'Messy Bun', description: 'Casual updo' },
-      { id: 'half-up-half-down', name: 'Half Up Half Down', description: 'Versatile style' },
-      { id: 'bangs', name: 'Bangs', description: 'Classic fringe' },
-      { id: 'shag', name: 'Shag', description: 'Retro layers' },
-      { id: 'curly', name: 'Curly', description: 'Bouncy curls' },
-      { id: 'blunt-cut', name: 'Blunt Cut', description: 'Sharp edges' },
-    ]
-  };
-
-  // Replicate hair colors - exact options from flux-kontext-apps/change-haircut API
-  const replicateHairColors = [
-    { id: 'no-change', name: 'No Change', description: 'Keep original' },
-    { id: 'random', name: 'Random', description: 'Surprise me' },
-    { id: 'blonde', name: 'Blonde', description: 'Light blonde' },
-    { id: 'brunette', name: 'Brunette', description: 'Rich brown' },
-    { id: 'black', name: 'Black', description: 'Deep black' },
-    { id: 'red', name: 'Red', description: 'Vibrant red' },
-    { id: 'platinum-blonde', name: 'Platinum', description: 'Icy blonde' },
-    { id: 'auburn', name: 'Auburn', description: 'Red-brown' },
-  ];
-
-  // Gemini hair colors
-  const geminiHairColors = [
-    { id: 'natural', name: 'Natural', description: 'Keep original' },
-    { id: 'blonde', name: 'Blonde', description: 'Light and bright' },
-    { id: 'brunette', name: 'Brunette', description: 'Rich brown' },
-    { id: 'black', name: 'Black', description: 'Deep and dark' },
-    { id: 'red', name: 'Red', description: 'Vibrant red' },
-    { id: 'platinum-blonde', name: 'Platinum', description: 'Icy blonde' },
-  ];
-
-  // Get current hairstyles and hair colors based on selected model
-  const currentStyles = selectedModel === 'gemini' ? geminiStyles : replicateStyles;
-  const hairStyles = currentStyles[selectedGender] || [];
-  const hairColors = selectedModel === 'gemini' ? geminiHairColors : replicateHairColors;
-
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError('Image size should be less than 10MB');
-        return;
-      }
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
-      setError('');
-      setGeneratedImage(null);
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (remainingTrials <= 0) {
-      setError('You have used all your free trials. Please sign up to continue!');
-      return;
-    }
-
-    if (!selectedImage || !selectedStyle) {
-      setError('Please select an image and a hairstyle');
-      return;
-    }
-
-    setIsGenerating(true);
-    setError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('image', selectedImage);
-      formData.append('style', selectedStyle);
-      formData.append('model', selectedModel);
-      formData.append('isTrial', 'true');
-
-      // Send hair color for both models (default to 'random' for Replicate if not selected)
-      if (selectedHairColor) {
-        formData.append('hairColor', selectedHairColor);
-      } else if (selectedModel === 'replicate') {
-        formData.append('hairColor', 'random');
-      }
-
-      const response = await axios.post(`${API_URL}/simulation/trial-generate`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (response.data.success) {
-        setGeneratedImage(response.data.data.generatedImageUrl);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   // Slider handlers for before/after comparison
   const handleSliderMove = (e) => {
@@ -229,6 +78,51 @@ const Landing = () => {
     navigate('/forgot-password');
   };
 
+  // How it works steps
+  const steps = [
+    {
+      number: '01',
+      title: 'Upload Your Photo',
+      description: 'Take a selfie or upload a clear photo of yourself. Make sure your face is clearly visible for best results.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      )
+    },
+    {
+      number: '02',
+      title: 'Select Your Style',
+      description: 'Browse through our collection of hairstyles. Choose from trendy cuts, classic looks, or bold new styles.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+        </svg>
+      )
+    },
+    {
+      number: '03',
+      title: 'Choose Hair Color',
+      description: 'Pick a hair color that complements your skin tone. Try natural shades or experiment with bold colors.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+        </svg>
+      )
+    },
+    {
+      number: '04',
+      title: 'Generate & Preview',
+      description: 'Our AI will generate your new look in seconds. Preview, save, or download your transformed image.',
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+      )
+    }
+  ];
+
+  // Features
   const features = [
     {
       icon: (
@@ -290,6 +184,32 @@ const Landing = () => {
 
             {/* Right side */}
             <div className="flex items-center space-x-3">
+              {/* Generation Count Indicator - Only show for logged-in users */}
+              {isAuthenticated && generationInfo && (
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                  {generationInfo.isVerified ? (
+                    <>
+                      <div className={`w-2 h-2 rounded-full ${
+                        generationInfo.remaining > 2 ? 'bg-green-500' :
+                        generationInfo.remaining > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}></div>
+                      <span className={`text-sm ${textSecondary}`}>
+                        <span className={`font-semibold ${textPrimary}`}>{generationInfo.remaining}</span>
+                        <span className="hidden sm:inline"> generations left</span>
+                        <span className="sm:hidden"> left</span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="text-sm text-yellow-500">Verify email</span>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Theme Toggle */}
               <button
                 onClick={() => setIsDark(!isDark)}
@@ -307,18 +227,30 @@ const Landing = () => {
                 )}
               </button>
 
-              <button
-                onClick={openLoginModal}
-                className={`${textSecondary} hover:${textPrimary} transition-colors px-3 py-2 text-sm`}
-              >
-                Sign In
-              </button>
-              <button
-                onClick={openRegisterModal}
-                className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-4 py-2 rounded-lg font-medium text-sm transition-colors`}
-              >
-                Get Started
-              </button>
+              {/* Show different buttons based on auth status */}
+              {isAuthenticated ? (
+                <button
+                  onClick={() => navigate('/simulation')}
+                  className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-4 py-2 rounded-lg font-medium text-sm transition-colors`}
+                >
+                  Go to Simulation
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={openLoginModal}
+                    className={`${textSecondary} hover:${textPrimary} transition-colors px-3 py-2 text-sm`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={openRegisterModal}
+                    className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-4 py-2 rounded-lg font-medium text-sm transition-colors`}
+                  >
+                    Get Started
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -340,22 +272,19 @@ const Landing = () => {
             Upload your photo and instantly preview different hairstyles using advanced AI technology.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="#try-now"
-              className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-6 py-3 rounded-lg font-medium transition-colors`}
-            >
-              Try It Free
-            </a>
             <button
               onClick={openRegisterModal}
+              className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-6 py-3 rounded-lg font-medium transition-colors`}
+            >
+              Start Now - It's Free
+            </button>
+            <a
+              href="#how-it-works"
               className={`border ${borderColorLight} ${textPrimary} px-6 py-3 rounded-lg font-medium hover:${bgSecondary} transition-colors`}
             >
-              Create Account
-            </button>
+              See How It Works
+            </a>
           </div>
-          <p className={`mt-3 ${textTertiary} text-sm`}>
-            Try it free - no sign up required!
-          </p>
         </div>
       </section>
 
@@ -459,15 +388,57 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* How It Works Section */}
+      <section id="how-it-works" className={`py-16 px-4 ${bgPrimary}`}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className={`text-2xl md:text-3xl font-bold mb-3 ${textPrimary}`}>How It Works</h2>
+            <p className={`${textSecondary} max-w-xl mx-auto`}>
+              Transform your look in just 4 simple steps. Our AI makes it easy to visualize your new hairstyle.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {steps.map((step, index) => (
+              <div
+                key={index}
+                className={`${bgSecondary} border ${borderColor} rounded-xl p-6 relative hover:border-gray-600 transition-colors`}
+              >
+                <div className={`absolute -top-3 -left-3 w-10 h-10 ${isDark ? 'bg-white text-black' : 'bg-gray-900 text-white'} rounded-full flex items-center justify-center text-sm font-bold`}>
+                  {step.number}
+                </div>
+                <div className={`w-14 h-14 ${bgTertiary} rounded-xl flex items-center justify-center mb-4 mt-2 ${textPrimary}`}>
+                  {step.icon}
+                </div>
+                <h3 className={`text-lg font-semibold mb-2 ${textPrimary}`}>{step.title}</h3>
+                <p className={`${textSecondary} text-sm`}>{step.description}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center mt-10">
+            <button
+              onClick={openRegisterModal}
+              className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-8 py-3 rounded-lg font-medium transition-colors text-lg`}
+            >
+              Try It Now
+            </button>
+            <p className={`${textTertiary} text-sm mt-3`}>
+              Free to start. No credit card required.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
-      <section className={`py-16 px-4 ${bgPrimary}`}>
+      <section className={`py-16 px-4 ${bgSecondary}`}>
         <div className="max-w-5xl mx-auto">
           <h2 className={`text-2xl font-bold text-center mb-10 ${textPrimary}`}>Why Choose HairAI</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {features.map((feature, index) => (
               <div
                 key={index}
-                className={`${bgSecondary} border ${borderColor} rounded-xl p-6 text-center hover:border-gray-600 transition-colors`}
+                className={`${bgPrimary} border ${borderColor} rounded-xl p-6 text-center hover:border-gray-600 transition-colors`}
               >
                 <div className={`w-12 h-12 ${bgTertiary} rounded-full flex items-center justify-center mx-auto mb-4 ${textPrimary}`}>
                   {feature.icon}
@@ -480,234 +451,27 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Try Now Section */}
-      <section id="try-now" className={`py-16 px-4 ${bgSecondary}`}>
-        <div className="max-w-5xl mx-auto">
-          <h2 className={`text-2xl font-bold text-center mb-2 ${textPrimary}`}>Try It Now</h2>
-          <p className={`${textSecondary} text-center mb-8`}>
-            Upload your photo and select a hairstyle
-          </p>
-
-          {error && (
-            <div className="bg-red-900/30 border border-red-800 text-red-300 px-4 py-3 rounded-lg mb-6 text-center max-w-2xl mx-auto">
-              {error}
-              {remainingTrials <= 0 && (
-                <button
-                  onClick={openRegisterModal}
-                  className="ml-2 underline hover:text-red-200"
-                >
-                  Sign up now
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Upload Section */}
-            <div className={`${bgPrimary} border ${borderColor} rounded-xl p-6`}>
-              <h3 className={`text-base font-semibold mb-4 ${textPrimary}`}>1. Upload Your Photo</h3>
-              <div
-                onClick={() => remainingTrials > 0 && fileInputRef.current?.click()}
-                className={`border-2 border-dashed ${borderColorLight} rounded-xl p-6 text-center ${
-                  remainingTrials > 0 ? 'cursor-pointer hover:border-gray-500' : 'opacity-50 cursor-not-allowed'
-                } transition-colors`}
-              >
-                {imagePreview ? (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="max-h-48 mx-auto rounded-lg object-contain"
-                  />
-                ) : (
-                  <>
-                    <svg className={`w-10 h-10 mx-auto ${textTertiary} mb-3`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className={textSecondary}>Click to upload</p>
-                    <p className={`${textTertiary} text-xs mt-1`}>JPG, PNG up to 10MB</p>
-                  </>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-                disabled={remainingTrials <= 0}
-              />
-
-              {/* AI Model Selection */}
-              <h3 className={`text-base font-semibold mt-5 mb-3 ${textPrimary}`}>2. Choose AI Model</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {modelOptions.map((model) => (
-                  <button
-                    key={model.value}
-                    onClick={() => {
-                      if (remainingTrials > 0) {
-                        setSelectedModel(model.value);
-                        setSelectedStyle('');
-                        setSelectedHairColor('');
-                      }
-                    }}
-                    disabled={remainingTrials <= 0}
-                    className={`p-3 rounded-lg border text-left transition-colors ${
-                      selectedModel === model.value
-                        ? isDark ? 'border-white bg-white/10' : 'border-gray-900 bg-gray-900/10'
-                        : `${borderColorLight} hover:border-gray-500`
-                    } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <p className={`font-medium text-sm ${textPrimary}`}>{model.label}</p>
-                    <p className={`${textTertiary} text-xs`}>{model.description}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Gender Selection */}
-              <h3 className={`text-base font-semibold mt-4 mb-3 ${textPrimary}`}>3. Select Gender</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => {
-                    if (remainingTrials > 0) {
-                      setSelectedGender('male');
-                      setSelectedStyle('');
-                    }
-                  }}
-                  disabled={remainingTrials <= 0}
-                  className={`p-3 rounded-lg border text-center transition-colors ${
-                    selectedGender === 'male'
-                      ? isDark ? 'border-white bg-white/10' : 'border-gray-900 bg-gray-900/10'
-                      : `${borderColorLight} hover:border-gray-500`
-                  } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <span className={`font-medium text-sm ${textPrimary}`}>Male</span>
-                </button>
-                <button
-                  onClick={() => {
-                    if (remainingTrials > 0) {
-                      setSelectedGender('female');
-                      setSelectedStyle('');
-                    }
-                  }}
-                  disabled={remainingTrials <= 0}
-                  className={`p-3 rounded-lg border text-center transition-colors ${
-                    selectedGender === 'female'
-                      ? isDark ? 'border-white bg-white/10' : 'border-gray-900 bg-gray-900/10'
-                      : `${borderColorLight} hover:border-gray-500`
-                  } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <span className={`font-medium text-sm ${textPrimary}`}>Female</span>
-                </button>
-              </div>
-
-              <h3 className={`text-base font-semibold mt-4 mb-3 ${textPrimary}`}>4. Select a Hairstyle</h3>
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                {hairStyles.map((style) => (
-                  <button
-                    key={style.id}
-                    onClick={() => remainingTrials > 0 && setSelectedStyle(style.id)}
-                    disabled={remainingTrials <= 0}
-                    className={`p-2 rounded-lg border text-left transition-colors ${
-                      selectedStyle === style.id
-                        ? isDark ? 'border-white bg-white/10' : 'border-gray-900 bg-gray-900/10'
-                        : `${borderColorLight} hover:border-gray-500`
-                    } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <p className={`font-medium text-xs ${textPrimary}`}>{style.name}</p>
-                    <p className={`${textTertiary} text-xs`}>{style.description}</p>
-                  </button>
-                ))}
-              </div>
-
-              {/* Hair Color Selection - Available for both models */}
-              <h3 className={`text-base font-semibold mt-4 mb-3 ${textPrimary}`}>5. Select Hair Color</h3>
-              <div className="grid grid-cols-4 gap-2">
-                {hairColors.map((color) => (
-                  <button
-                    key={color.id}
-                    onClick={() => remainingTrials > 0 && setSelectedHairColor(color.id)}
-                    disabled={remainingTrials <= 0}
-                    className={`p-2 rounded-lg border text-center transition-colors ${
-                      selectedHairColor === color.id
-                        ? isDark ? 'border-white bg-white/10' : 'border-gray-900 bg-gray-900/10'
-                        : `${borderColorLight} hover:border-gray-500`
-                    } ${remainingTrials <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <p className={`font-medium text-xs ${textPrimary}`}>{color.name}</p>
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={handleGenerate}
-                disabled={isGenerating || !selectedImage || !selectedStyle || remainingTrials <= 0}
-                className={`w-full mt-5 py-3 rounded-lg font-medium transition-colors ${
-                  isGenerating || !selectedImage || !selectedStyle || remainingTrials <= 0
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
-                }`}
-              >
-                {isGenerating ? 'Generating...' : `Generate with ${selectedModel === 'gemini' ? 'Gemini' : 'Replicate'}`}
-              </button>
-            </div>
-
-            {/* Result Section */}
-            <div className={`${bgPrimary} border ${borderColor} rounded-xl p-6`}>
-              <h3 className={`text-base font-semibold mb-4 ${textPrimary}`}>Result</h3>
-              <div className={`border-2 border-dashed ${borderColorLight} rounded-xl p-6 min-h-[350px] flex items-center justify-center`}>
-                {isGenerating ? (
-                  <div className="text-center">
-                    <div className={`w-10 h-10 border-4 ${isDark ? 'border-gray-600 border-t-white' : 'border-gray-300 border-t-gray-900'} rounded-full animate-spin mx-auto mb-3`}></div>
-                    <p className={textSecondary}>Generating your new look...</p>
-                  </div>
-                ) : generatedImage ? (
-                  <img
-                    src={generatedImage}
-                    alt="Generated"
-                    className="max-h-72 mx-auto rounded-lg object-contain"
-                  />
-                ) : (
-                  <div className={`text-center ${textTertiary}`}>
-                    <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <p>Your result will appear here</p>
-                  </div>
-                )}
-              </div>
-
-              {generatedImage && (
-                <div className="mt-4 text-center">
-                  <p className={`${textSecondary} text-sm mb-3`}>
-                    Like what you see? Sign up for more!
-                  </p>
-                  <button
-                    onClick={openRegisterModal}
-                    className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-5 py-2 rounded-lg font-medium text-sm transition-colors`}
-                  >
-                    Create Free Account
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className={`py-16 px-4 ${bgPrimary}`}>
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className={`text-2xl md:text-3xl font-bold mb-3 ${textPrimary}`}>Ready to Transform?</h2>
+          <h2 className={`text-2xl md:text-3xl font-bold mb-3 ${textPrimary}`}>Ready to Transform Your Look?</h2>
           <p className={`${textSecondary} mb-6`}>
-            Join thousands of users who have discovered their perfect hairstyle
+            Join thousands of users who have discovered their perfect hairstyle. Sign up now and start experimenting with new looks!
           </p>
-          <button
-            onClick={openRegisterModal}
-            className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-6 py-3 rounded-lg font-medium transition-colors`}
-          >
-            Get Started Free
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={openRegisterModal}
+              className={`${isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'} px-6 py-3 rounded-lg font-medium transition-colors`}
+            >
+              Create Free Account
+            </button>
+            <button
+              onClick={openLoginModal}
+              className={`border ${borderColorLight} ${textPrimary} px-6 py-3 rounded-lg font-medium hover:${bgSecondary} transition-colors`}
+            >
+              I Already Have an Account
+            </button>
+          </div>
         </div>
       </section>
 
