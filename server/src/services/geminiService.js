@@ -26,9 +26,9 @@ class GeminiService {
     }
 
     try {
-      // Use Gemini 2.0 Flash for image generation
+      // Use Gemini 2.5 Flash Image for image generation
       const model = this.genAI.getGenerativeModel({
-        model: "gemini-2.0-flash-exp-image-generation",
+        model: "gemini-2.5-flash-image",
         generationConfig: {
           responseModalities: ["Text", "Image"]
         }
@@ -68,12 +68,16 @@ class GeminiService {
       const response = result.response;
 
       console.log('Gemini response received');
+      console.log('Response structure:', JSON.stringify(response, null, 2).substring(0, 500));
 
       // Extract the generated image from the response
       if (response.candidates && response.candidates[0]) {
-        const parts = response.candidates[0].content.parts;
+        const parts = response.candidates[0].content?.parts || [];
+        console.log('Number of parts:', parts.length);
 
         for (const part of parts) {
+          console.log('Part keys:', Object.keys(part));
+
           if (part.inlineData) {
             // Return as data URI
             const generatedImageBase64 = part.inlineData.data;
@@ -83,9 +87,17 @@ class GeminiService {
             console.log('✓ Gemini haircut simulation completed successfully');
             return dataUri;
           }
+
+          // Check for fileData (alternative response format)
+          if (part.fileData) {
+            console.log('Found fileData:', part.fileData);
+            // Handle fileData format if needed
+          }
         }
       }
 
+      // Log full response if no image found
+      console.log('Full response:', JSON.stringify(response, null, 2));
       throw new Error('No image generated in Gemini response');
 
     } catch (error) {

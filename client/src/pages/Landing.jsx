@@ -34,18 +34,8 @@ const Landing = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
 
-  // Trial count from localStorage
-  const getTrialCount = () => {
-    return parseInt(localStorage.getItem('trialGenerations') || '0');
-  };
-
-  const incrementTrialCount = () => {
-    const count = getTrialCount() + 1;
-    localStorage.setItem('trialGenerations', count.toString());
-    return count;
-  };
-
-  const remainingTrials = 2 - getTrialCount();
+  // Trial count - unlimited for now (TODO: implement limitations later)
+  const remainingTrials = 999; // Unlimited trials
 
   // AI Model options
   const modelOptions = [
@@ -188,7 +178,6 @@ const Landing = () => {
 
       if (response.data.success) {
         setGeneratedImage(response.data.data.generatedImageUrl);
-        incrementTrialCount();
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to generate. Please try again.');
@@ -365,10 +354,7 @@ const Landing = () => {
             </button>
           </div>
           <p className={`mt-3 ${textTertiary} text-sm`}>
-            {remainingTrials > 0
-              ? `${remainingTrials} free trial${remainingTrials > 1 ? 's' : ''} remaining`
-              : 'Sign up for more generations!'
-            }
+            Try it free - no sign up required!
           </p>
         </div>
       </section>
