@@ -1,25 +1,48 @@
 const { getFirestore, getAuth } = require('../config/firebase');
 const bcrypt = require('bcryptjs');
 
-// Subscription tiers configuration
-const SUBSCRIPTION_TIERS = {
-  free: {
-    name: 'Free',
-    dailyLimit: 5,
-    price: 0,
-    features: ['5 generations per day', 'Basic AI models', 'Standard quality']
+// Free tier configuration (all users get 3 free generations total, then must buy credits)
+const FREE_TIER = {
+  name: 'Free',
+  freeGenerations: 3, // Total free generations per account (not daily)
+  features: ['3 free generations (lifetime)', 'All AI models', 'Standard quality']
+};
+
+// Credit packages for purchase
+const CREDIT_PACKAGES = {
+  starter: {
+    id: 'starter',
+    name: 'Starter Pack',
+    credits: 10,
+    price: 1.99,
+    pricePerCredit: 0.20,
+    savings: null
   },
-  premium: {
-    name: 'Premium',
-    dailyLimit: 50,
+  popular: {
+    id: 'popular',
+    name: 'Popular Pack',
+    credits: 30,
+    price: 4.99,
+    pricePerCredit: 0.17,
+    savings: '15% OFF',
+    popular: true
+  },
+  pro: {
+    id: 'pro',
+    name: 'Pro Pack',
+    credits: 75,
     price: 9.99,
-    features: ['50 generations per day', 'All AI models', 'HD quality', 'Priority processing', 'Save unlimited history']
+    pricePerCredit: 0.13,
+    savings: '35% OFF'
   },
-  unlimited: {
-    name: 'Unlimited',
-    dailyLimit: -1, // -1 means unlimited
+  mega: {
+    id: 'mega',
+    name: 'Mega Pack',
+    credits: 200,
     price: 19.99,
-    features: ['Unlimited generations', 'All AI models', 'HD quality', 'Priority processing', 'Save unlimited history', 'Early access to new features']
+    pricePerCredit: 0.10,
+    savings: '50% OFF',
+    bestValue: true
   }
 };
 
@@ -137,9 +160,6 @@ class UserService {
   }
 
   getPublicProfile(user) {
-    const subscription = user.subscription || { tier: 'free', isActive: false };
-    const tierInfo = SUBSCRIPTION_TIERS[subscription.tier] || SUBSCRIPTION_TIERS.free;
-
     return {
       id: user.id || user.uid,
       username: user.username,
@@ -149,15 +169,7 @@ class UserService {
       profileImage: user.profileImage,
       createdAt: user.createdAt,
       generationCount: user.generationCount || 0,
-      lastGenerationReset: user.lastGenerationReset || null,
-      subscription: {
-        tier: subscription.tier || 'free',
-        tierName: tierInfo.name,
-        isActive: subscription.isActive || false,
-        endDate: subscription.endDate || null,
-        dailyLimit: tierInfo.dailyLimit,
-        features: tierInfo.features
-      },
+      freeLimit: FREE_TIER.freeGenerations,
       credits: user.credits || 0
     };
   }
@@ -174,101 +186,29 @@ class UserService {
     return await this.findById(userId);
   }
 
-  // Get generation info with 24-hour reset and tier-based limits
+  // Get generation info (no daily reset - 3 free per account lifetime)
   async getGenerationInfo(userId) {
     const user = await this.findById(userId);
-
-    // Get user's subscription tier
-    const subscription = user?.subscription || { tier: 'free', isActive: false };
-    const tierInfo = SUBSCRIPTION_TIERS[subscription.tier] || SUBSCRIPTION_TIERS.free;
-
-    // Check if premium subscription is still active
-    let activeTier = 'free';
-    if (subscription.tier !== 'free' && subscription.isActive) {
-      const endDate = subscription.endDate ? new Date(subscription.endDate) : null;
-      if (endDate && endDate > new Date()) {
-        activeTier = subscription.tier;
-      } else {
-        // Subscription expired, reset to free
-        await this.usersCollection.doc(userId).update({
-          'subscription.tier': 'free',
-          'subscription.isActive': false
-        });
-      }
-    }
-
-    const currentTierInfo = SUBSCRIPTION_TIERS[activeTier];
-    const dailyLimit = currentTierInfo.dailyLimit;
+    const freeLimit = FREE_TIER.freeGenerations;
     const credits = user?.credits || 0;
+    const currentCount = user?.generationCount || 0;
 
-    const lastResetTime = user?.lastGenerationReset ? new Date(user.lastGenerationReset) : null;
-    const now = new Date();
-
-    // Check if 24 hours have passed since last reset
-    let currentCount = user?.generationCount || 0;
-    let resetInHours = 24;
-
-    if (lastResetTime) {
-      const hoursSinceReset = (now - lastResetTime) / (1000 * 60 * 60);
-
-      if (hoursSinceReset >= 24) {
-        // Reset the count - 24 hours have passed
-        currentCount = 0;
-        await this.usersCollection.doc(userId).update({
-          generationCount: 0,
-          lastGenerationReset: now.toISOString()
-        });
-        resetInHours = 24;
-      } else {
-        // Calculate hours until reset
-        resetInHours = Math.ceil(24 - hoursSinceReset);
-      }
-    }
-
-    // Calculate remaining (unlimited tier returns -1 for unlimited)
-    const isUnlimited = dailyLimit === -1;
-    const remaining = isUnlimited ? -1 : Math.max(0, dailyLimit - currentCount);
+    const remaining = Math.max(0, freeLimit - currentCount);
 
     return {
       count: currentCount,
-      limit: dailyLimit,
+      limit: freeLimit,
       remaining,
-      resetInHours,
-      isUnlimited,
-      tier: activeTier,
-      tierName: currentTierInfo.name,
       credits,
-      totalAvailable: isUnlimited ? -1 : remaining + credits
+      totalAvailable: remaining + credits
     };
   }
 
   async incrementGenerationCount(userId) {
     const user = await this.findById(userId);
     const currentCount = user?.generationCount || 0;
-    const lastResetTime = user?.lastGenerationReset ? new Date(user.lastGenerationReset) : null;
-    const now = new Date();
 
-    // Check if we need to reset (24 hours passed)
-    if (lastResetTime) {
-      const hoursSinceReset = (now - lastResetTime) / (1000 * 60 * 60);
-      if (hoursSinceReset >= 24) {
-        // Reset and set count to 1
-        await this.usersCollection.doc(userId).update({
-          generationCount: 1,
-          lastGenerationReset: now.toISOString()
-        });
-        return 1;
-      }
-    } else {
-      // First generation ever - set reset time
-      await this.usersCollection.doc(userId).update({
-        generationCount: 1,
-        lastGenerationReset: now.toISOString()
-      });
-      return 1;
-    }
-
-    // Increment count
+    // Simply increment count (no reset)
     const newCount = currentCount + 1;
     await this.usersCollection.doc(userId).update({
       generationCount: newCount
@@ -357,35 +297,7 @@ class UserService {
     return { user: this.getPublicProfile(userDoc), isNewUser: true };
   }
 
-  // Subscription management methods
-  async updateSubscription(userId, tier, durationMonths = 1) {
-    if (!SUBSCRIPTION_TIERS[tier]) {
-      throw new Error('Invalid subscription tier');
-    }
-
-    const now = new Date();
-    const endDate = new Date(now);
-    endDate.setMonth(endDate.getMonth() + durationMonths);
-
-    await this.usersCollection.doc(userId).update({
-      subscription: {
-        tier,
-        startDate: now.toISOString(),
-        endDate: endDate.toISOString(),
-        isActive: true
-      }
-    });
-
-    return await this.findById(userId);
-  }
-
-  async cancelSubscription(userId) {
-    await this.usersCollection.doc(userId).update({
-      'subscription.isActive': false
-    });
-    return await this.findById(userId);
-  }
-
+  // Credit management methods
   async addCredits(userId, amount) {
     const user = await this.findById(userId);
     const currentCredits = user?.credits || 0;
@@ -413,12 +325,30 @@ class UserService {
     return true;
   }
 
-  getSubscriptionTiers() {
-    return SUBSCRIPTION_TIERS;
+  async purchaseCredits(userId, packageId) {
+    const pkg = CREDIT_PACKAGES[packageId];
+    if (!pkg) {
+      throw new Error('Invalid credit package');
+    }
+
+    const newCredits = await this.addCredits(userId, pkg.credits);
+    return {
+      package: pkg,
+      newBalance: newCredits
+    };
+  }
+
+  getCreditPackages() {
+    return CREDIT_PACKAGES;
+  }
+
+  getFreeTier() {
+    return FREE_TIER;
   }
 }
 
 const userServiceInstance = new UserService();
 
 module.exports = userServiceInstance;
-module.exports.SUBSCRIPTION_TIERS = SUBSCRIPTION_TIERS;
+module.exports.FREE_TIER = FREE_TIER;
+module.exports.CREDIT_PACKAGES = CREDIT_PACKAGES;

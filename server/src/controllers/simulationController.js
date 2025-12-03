@@ -25,8 +25,8 @@ const generateSimulation = async (req, res) => {
     if (userId) {
       const generationInfo = await userService.getGenerationInfo(userId);
 
-      // Check if user has reached their daily limit (unless unlimited)
-      if (!generationInfo.isUnlimited && generationInfo.remaining <= 0) {
+      // Check if user has reached their free generation limit
+      if (generationInfo.remaining <= 0) {
         // Check if user wants to use credits
         if (useCredit && generationInfo.credits > 0) {
           const creditUsed = await userService.useCredit(userId);
@@ -43,28 +43,22 @@ const generateSimulation = async (req, res) => {
           // User has credits but didn't opt to use them
           return res.status(403).json({
             success: false,
-            message: `You have used all ${generationInfo.limit} generations for today. You have ${generationInfo.credits} credits available. Resets in ${generationInfo.resetInHours} hours.`,
+            message: `You have used all ${generationInfo.limit} free generations. You have ${generationInfo.credits} credits available.`,
             limitReached: true,
             generationCount: generationInfo.count,
             limit: generationInfo.limit,
-            resetInHours: generationInfo.resetInHours,
             credits: generationInfo.credits,
-            canUseCredits: true,
-            tier: generationInfo.tier,
-            tierName: generationInfo.tierName
+            canUseCredits: true
           });
         } else {
           return res.status(403).json({
             success: false,
-            message: `You have used all ${generationInfo.limit} generations for today. Upgrade to Premium for more! Resets in ${generationInfo.resetInHours} hours.`,
+            message: `You have used all ${generationInfo.limit} free generations. Buy credits for more!`,
             limitReached: true,
             generationCount: generationInfo.count,
             limit: generationInfo.limit,
-            resetInHours: generationInfo.resetInHours,
             credits: 0,
-            canUseCredits: false,
-            tier: generationInfo.tier,
-            tierName: generationInfo.tierName
+            canUseCredits: false
           });
         }
       }
@@ -264,14 +258,10 @@ const getGenerationLimit = async (req, res) => {
         success: true,
         data: {
           generationCount: 0,
-          limit: 5,
-          remaining: 5,
-          resetInHours: 24,
-          tier: 'free',
-          tierName: 'Free',
-          isUnlimited: false,
+          limit: 3,
+          remaining: 3,
           credits: 0,
-          totalAvailable: 5
+          totalAvailable: 3
         }
       });
     }
@@ -284,10 +274,6 @@ const getGenerationLimit = async (req, res) => {
         generationCount: generationInfo.count,
         limit: generationInfo.limit,
         remaining: generationInfo.remaining,
-        resetInHours: generationInfo.resetInHours,
-        tier: generationInfo.tier,
-        tierName: generationInfo.tierName,
-        isUnlimited: generationInfo.isUnlimited,
         credits: generationInfo.credits,
         totalAvailable: generationInfo.totalAvailable
       }

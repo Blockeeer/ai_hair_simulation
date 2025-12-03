@@ -1,190 +1,101 @@
 const userService = require('../services/userService');
-const { SUBSCRIPTION_TIERS } = require('../services/userService');
+const stripeService = require('../services/stripeService');
+const { FREE_TIER, CREDIT_PACKAGES } = require('../services/userService');
 
-// @desc    Get all subscription tiers
-// @route   GET /api/subscription/tiers
+// @desc    Get credit packages
+// @route   GET /api/subscription/packages
 // @access  Public
-exports.getTiers = async (req, res) => {
+exports.getPackages = async (req, res) => {
   try {
+    // Check if Stripe is configured
+    const stripeEnabled = !!process.env.STRIPE_SECRET_KEY;
+
     res.json({
       success: true,
-      data: SUBSCRIPTION_TIERS
+      data: {
+        freeTier: FREE_TIER,
+        packages: Object.values(CREDIT_PACKAGES),
+        stripeEnabled
+      }
     });
   } catch (error) {
-    console.error('Get tiers error:', error);
+    console.error('Get packages error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching subscription tiers'
+      message: 'Error fetching credit packages'
     });
   }
 };
 
-// @desc    Get current user's subscription status
+// @desc    Get current user's generation status
 // @route   GET /api/subscription/status
 // @access  Private
 exports.getStatus = async (req, res) => {
   try {
     const userId = req.user.id;
     const generationInfo = await userService.getGenerationInfo(userId);
-    const user = await userService.getUserById(userId);
 
     res.json({
       success: true,
       data: {
-        tier: generationInfo.tier,
-        tierName: generationInfo.tierName,
-        isUnlimited: generationInfo.isUnlimited,
-        dailyLimit: generationInfo.limit,
+        freeLimit: generationInfo.limit,
         generationsUsed: generationInfo.count,
         generationsRemaining: generationInfo.remaining,
-        resetInHours: generationInfo.resetInHours,
         credits: generationInfo.credits,
-        totalAvailable: generationInfo.totalAvailable,
-        subscription: user?.subscription || { tier: 'free', isActive: false }
+        totalAvailable: generationInfo.totalAvailable
       }
     });
   } catch (error) {
-    console.error('Get subscription status error:', error);
+    console.error('Get status error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching subscription status'
+      message: 'Error fetching generation status'
     });
   }
 };
 
-// @desc    Upgrade subscription (mock - would integrate with payment provider)
-// @route   POST /api/subscription/upgrade
-// @access  Private
-exports.upgrade = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { tier, paymentToken } = req.body;
-
-    // Validate tier
-    if (!SUBSCRIPTION_TIERS[tier] || tier === 'free') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid subscription tier'
-      });
-    }
-
-    // TODO: Integrate with payment provider (Stripe, PayPal, etc.)
-    // For now, this is a mock implementation
-    // In production, you would:
-    // 1. Validate the payment token with your payment provider
-    // 2. Process the payment
-    // 3. Only update subscription if payment succeeds
-
-    // Mock: Assume payment is successful
-    const user = await userService.updateSubscription(userId, tier, 1);
-
-    res.json({
-      success: true,
-      message: `Successfully upgraded to ${SUBSCRIPTION_TIERS[tier].name} plan!`,
-      data: {
-        subscription: user.subscription,
-        user: userService.getPublicProfile(user)
-      }
-    });
-  } catch (error) {
-    console.error('Upgrade subscription error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error upgrading subscription'
-    });
-  }
-};
-
-// @desc    Cancel subscription
-// @route   POST /api/subscription/cancel
-// @access  Private
-exports.cancel = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await userService.cancelSubscription(userId);
-
-    res.json({
-      success: true,
-      message: 'Subscription cancelled. You will retain access until the end of your billing period.',
-      data: {
-        subscription: user.subscription
-      }
-    });
-  } catch (error) {
-    console.error('Cancel subscription error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error cancelling subscription'
-    });
-  }
-};
-
-// @desc    Purchase credits
-// @route   POST /api/subscription/credits/purchase
+// @desc    Purchase credits (Starter pack enabled for testing, others coming soon)
+// @route   POST /api/subscription/purchase
 // @access  Private
 exports.purchaseCredits = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { amount, paymentToken } = req.body;
+    const { packageId } = req.body;
 
-    if (!amount || amount < 1) {
+    if (!packageId || !CREDIT_PACKAGES[packageId]) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid credit amount'
+        message: 'Invalid credit package'
       });
     }
 
-    // Credit packages
-    const creditPackages = {
-      10: 4.99,
-      25: 9.99,
-      50: 17.99,
-      100: 29.99
-    };
+    const pkg = CREDIT_PACKAGES[packageId];
 
-    // TODO: Integrate with payment provider
-    // For now, this is a mock implementation
+    // Starter pack is enabled for testing - actually adds credits
+    if (packageId === 'starter') {
+      const result = await userService.purchaseCredits(userId, packageId);
+      return res.json({
+        success: true,
+        message: `Successfully purchased ${result.package.credits} credits!`,
+        data: {
+          package: result.package,
+          creditsAdded: result.package.credits,
+          newBalance: result.newBalance
+        }
+      });
+    }
 
-    const newCredits = await userService.addCredits(userId, amount);
-
+    // Other packages show coming soon
     res.json({
-      success: true,
-      message: `Successfully purchased ${amount} credits!`,
-      data: {
-        creditsAdded: amount,
-        totalCredits: newCredits
-      }
+      success: false,
+      comingSoon: true,
+      message: `Credit purchases coming soon! ${pkg.name} (${pkg.credits} credits for $${pkg.price}) will be available shortly.`
     });
   } catch (error) {
     console.error('Purchase credits error:', error);
     res.status(500).json({
       success: false,
       message: 'Error purchasing credits'
-    });
-  }
-};
-
-// @desc    Get credit packages
-// @route   GET /api/subscription/credits/packages
-// @access  Public
-exports.getCreditPackages = async (req, res) => {
-  try {
-    const packages = [
-      { credits: 10, price: 4.99, popular: false },
-      { credits: 25, price: 9.99, popular: true },
-      { credits: 50, price: 17.99, popular: false },
-      { credits: 100, price: 29.99, popular: false }
-    ];
-
-    res.json({
-      success: true,
-      data: packages
-    });
-  } catch (error) {
-    console.error('Get credit packages error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching credit packages'
     });
   }
 };
