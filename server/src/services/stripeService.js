@@ -1,7 +1,13 @@
 const Stripe = require('stripe');
 
-// Initialize Stripe with secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Initialize Stripe with secret key (only if key is provided)
+let stripe = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  console.log('✓ Stripe initialized successfully');
+} else {
+  console.warn('⚠ Stripe not configured - STRIPE_SECRET_KEY is missing. Payment features will be disabled.');
+}
 
 // Credit packages with Stripe price configuration
 const STRIPE_PRODUCTS = {
@@ -37,6 +43,14 @@ const STRIPE_PRODUCTS = {
 
 class StripeService {
   /**
+   * Check if Stripe is configured
+   * @returns {boolean}
+   */
+  isConfigured() {
+    return stripe !== null;
+  }
+
+  /**
    * Create a Stripe Checkout Session for credit purchase
    * @param {string} packageId - The credit package ID
    * @param {string} userId - The user's ID
@@ -44,6 +58,10 @@ class StripeService {
    * @returns {Promise<Object>} - Checkout session object
    */
   async createCheckoutSession(packageId, userId, userEmail) {
+    if (!stripe) {
+      throw new Error('Stripe is not configured. Please add STRIPE_SECRET_KEY to environment variables.');
+    }
+
     const product = STRIPE_PRODUCTS[packageId];
 
     if (!product) {
@@ -88,6 +106,9 @@ class StripeService {
    * @returns {Promise<Object>} - Session object with payment status
    */
   async getCheckoutSession(sessionId) {
+    if (!stripe) {
+      throw new Error('Stripe is not configured');
+    }
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     return session;
   }
@@ -99,6 +120,9 @@ class StripeService {
    * @returns {Object} - Verified event object
    */
   constructWebhookEvent(payload, signature) {
+    if (!stripe) {
+      throw new Error('Stripe is not configured');
+    }
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
   }
