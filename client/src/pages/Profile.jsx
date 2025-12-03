@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 const Profile = () => {
   const navigate = useNavigate();
   const { user, logout, updateProfile, changePassword, updateProfilePicture, removeProfilePicture } = useAuth();
-  const { theme, isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
   const fileInputRef = useRef(null);
@@ -202,13 +202,19 @@ const Profile = () => {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-black' : 'bg-gray-100'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Animated background gradient */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute -top-40 -right-40 w-80 h-80 ${isDark ? 'bg-purple-600/10' : 'bg-purple-400/20'} rounded-full blur-3xl`}></div>
+        <div className={`absolute top-1/2 -left-40 w-80 h-80 ${isDark ? 'bg-pink-600/10' : 'bg-pink-400/20'} rounded-full blur-3xl`}></div>
+      </div>
+
       {/* Toast Message */}
       {message.text && (
-        <div className={`fixed top-16 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg max-w-sm mx-4 flex items-center gap-3 ${
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-2xl max-w-sm mx-4 flex items-center gap-3 border backdrop-blur-xl ${
           message.type === 'success'
-            ? 'bg-green-900 bg-opacity-90 border border-green-700 text-green-200'
-            : 'bg-red-900 bg-opacity-90 border border-red-700 text-red-200'
+            ? 'bg-green-900/80 border-green-700/50 text-green-200'
+            : 'bg-red-900/80 border-red-700/50 text-red-200'
         }`}>
           <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
             {message.type === 'success' ? (
@@ -230,11 +236,11 @@ const Profile = () => {
       )}
 
       {/* Navbar */}
-      <header className={`${isDark ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-40 transition-colors duration-300`}>
+      <header className={`${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'} backdrop-blur-xl border-b sticky top-0 z-40 transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           <h1
             onClick={() => navigate('/landing')}
-            className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} cursor-pointer hover:opacity-80 transition-opacity`}
+            className="text-lg md:text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
           >
             AI Hair Simulation
           </h1>
@@ -259,7 +265,7 @@ const Profile = () => {
                 <img
                   src={user.profileImage}
                   alt=""
-                  className="w-6 h-6 rounded-full object-cover"
+                  className="w-6 h-6 rounded-full object-cover ring-2 ring-purple-500/50"
                 />
               ) : (
                 <div className={`w-6 h-6 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
@@ -295,7 +301,7 @@ const Profile = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className={`md:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-t px-4 py-3 space-y-3`}>
+          <div className={`md:hidden ${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-gray-200'} backdrop-blur-xl border-t px-4 py-3 space-y-3`}>
             <div className="flex items-center gap-2">
               {user?.profileImage ? (
                 <img
@@ -333,8 +339,10 @@ const Profile = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 py-8">
-        <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-6`}>Account Settings</h2>
+      <main className="relative max-w-2xl mx-auto px-4 py-8">
+        <h2 className={`text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-6`}>
+          Account <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">Settings</span>
+        </h2>
 
         {/* Tabs */}
         <div className={`flex border-b ${isDark ? 'border-gray-800' : 'border-gray-200'} mb-6`}>
@@ -342,7 +350,7 @@ const Profile = () => {
             onClick={() => setActiveTab('profile')}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === 'profile'
-                ? isDark ? 'text-white border-b-2 border-white' : 'text-gray-900 border-b-2 border-gray-900'
+                ? 'text-purple-500 border-b-2 border-purple-500'
                 : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -352,7 +360,7 @@ const Profile = () => {
             onClick={() => setActiveTab('password')}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === 'password'
-                ? isDark ? 'text-white border-b-2 border-white' : 'text-gray-900 border-b-2 border-gray-900'
+                ? 'text-purple-500 border-b-2 border-purple-500'
                 : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -364,14 +372,14 @@ const Profile = () => {
         {activeTab === 'profile' && (
           <form onSubmit={handleProfileSubmit} className="space-y-5">
             {/* Profile Picture Section */}
-            <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border p-6 transition-colors duration-300`}>
+            <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl rounded-2xl border p-6 transition-colors duration-300`}>
               <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-4`}>
                 Profile Picture
               </label>
               <div className="flex items-center gap-6">
                 {/* Avatar */}
                 <div className="relative">
-                  <div className={`w-24 h-24 rounded-full overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-300'} border-2`}>
+                  <div className={`w-24 h-24 rounded-full overflow-hidden border-2 ${isDark ? 'bg-gray-800 border-purple-500/50' : 'bg-gray-100 border-purple-500/50'}`}>
                     {user?.profileImage ? (
                       <img
                         src={user.profileImage}
@@ -388,7 +396,7 @@ const Profile = () => {
                   </div>
                   {isUploadingPicture && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
-                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-white"></div>
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-500"></div>
                     </div>
                   )}
                 </div>
@@ -406,7 +414,7 @@ const Profile = () => {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploadingPicture}
-                    className="bg-white hover:bg-gray-200 text-black px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
                     {user?.profileImage ? 'Change Photo' : 'Upload Photo'}
                   </button>
@@ -425,7 +433,7 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border p-6 space-y-5 transition-colors duration-300`}>
+            <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl rounded-2xl border p-6 space-y-5 transition-colors duration-300`}>
               {/* Username */}
               <div>
                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
@@ -436,7 +444,7 @@ const Profile = () => {
                   name="username"
                   value={profileForm.username}
                   onChange={handleProfileChange}
-                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all`}
                   placeholder="Enter username"
                 />
               </div>
@@ -451,7 +459,7 @@ const Profile = () => {
                   name="firstName"
                   value={profileForm.firstName}
                   onChange={handleProfileChange}
-                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all`}
                   placeholder="Enter first name"
                 />
               </div>
@@ -466,7 +474,7 @@ const Profile = () => {
                   name="lastName"
                   value={profileForm.lastName}
                   onChange={handleProfileChange}
-                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all`}
                   placeholder="Enter last name"
                 />
               </div>
@@ -481,7 +489,7 @@ const Profile = () => {
                   name="email"
                   value={profileForm.email}
                   disabled
-                  className={`w-full ${isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-500'} border px-4 py-3 rounded-lg text-sm cursor-not-allowed`}
+                  className={`w-full ${isDark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-500'} border px-4 py-3 rounded-xl text-sm cursor-not-allowed`}
                 />
                 <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-1`}>Email cannot be changed</p>
               </div>
@@ -490,13 +498,20 @@ const Profile = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-3 rounded-lg font-medium text-sm transition-colors ${
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
                 isLoading
                   ? isDark ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-500 hover:to-pink-500 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/25'
               }`}
             >
-              {isLoading ? 'Saving...' : 'Save Changes'}
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  Saving...
+                </span>
+              ) : (
+                'Save Changes'
+              )}
             </button>
           </form>
         )}
@@ -504,7 +519,7 @@ const Profile = () => {
         {/* Password Tab */}
         {activeTab === 'password' && (
           <form onSubmit={handlePasswordSubmit} className="space-y-5">
-            <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border p-6 space-y-5 transition-colors duration-300`}>
+            <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl rounded-2xl border p-6 space-y-5 transition-colors duration-300`}>
               {/* Current Password */}
               <div>
                 <label className={`block text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
@@ -515,7 +530,7 @@ const Profile = () => {
                   name="currentPassword"
                   value={passwordForm.currentPassword}
                   onChange={handlePasswordChange}
-                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all`}
                   placeholder="Enter current password"
                   required
                 />
@@ -531,7 +546,7 @@ const Profile = () => {
                   name="newPassword"
                   value={passwordForm.newPassword}
                   onChange={handlePasswordChange}
-                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all`}
                   placeholder="Enter new password"
                   required
                 />
@@ -550,7 +565,7 @@ const Profile = () => {
                   name="confirmPassword"
                   value={passwordForm.confirmPassword}
                   onChange={handlePasswordChange}
-                  className={`w-full ${isDark ? 'bg-black border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-lg focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'} text-sm`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-sm transition-all`}
                   placeholder="Confirm new password"
                   required
                 />
@@ -560,31 +575,38 @@ const Profile = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-3 rounded-lg font-medium text-sm transition-colors ${
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-all ${
                 isLoading
                   ? isDark ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-500 hover:to-pink-500 hover:scale-[1.02] hover:shadow-lg hover:shadow-purple-500/25'
               }`}
             >
-              {isLoading ? 'Changing...' : 'Change Password'}
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  Changing...
+                </span>
+              ) : (
+                'Change Password'
+              )}
             </button>
           </form>
         )}
 
         {/* Theme Settings */}
-        <div className={`mt-8 p-4 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border transition-colors duration-300`}>
+        <div className={`mt-8 p-6 ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl rounded-2xl border transition-colors duration-300`}>
           <h3 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-4`}>Appearance</h3>
           <div className="flex items-center justify-between">
             <div>
               <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-sm font-medium`}>Theme</p>
               <p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>Choose your preferred color scheme</p>
             </div>
-            <div className={`flex items-center gap-2 ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg p-1`}>
+            <div className={`flex items-center gap-1 ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-xl p-1`}>
               <button
                 onClick={() => !isDark && toggleTheme()}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all ${
                   isDark
-                    ? 'bg-gray-700 text-white'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -595,9 +617,9 @@ const Profile = () => {
               </button>
               <button
                 onClick={() => isDark && toggleTheme()}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-all ${
                   !isDark
-                    ? 'bg-white text-gray-900 shadow-sm'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
@@ -611,10 +633,10 @@ const Profile = () => {
         </div>
 
         {/* Account Info */}
-        <div className={`mt-4 p-4 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} rounded-lg border transition-colors duration-300`}>
+        <div className={`mt-4 p-6 ${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl rounded-2xl border transition-colors duration-300`}>
           <h3 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} mb-3`}>Account Info</h3>
           <div className={`space-y-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-            <p>Member since: <span className={isDark ? 'text-white' : 'text-gray-900'}>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span></p>
+            <p>Member since: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span></p>
             <p>Account ID: <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-mono`}>{user?.id?.slice(0, 8) || 'N/A'}...</span></p>
           </div>
         </div>

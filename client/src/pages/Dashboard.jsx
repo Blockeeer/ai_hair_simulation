@@ -37,10 +37,14 @@ const Dashboard = () => {
   // Modal view mode: 'slider' or 'sideBySide'
   const [modalViewMode, setModalViewMode] = useState('slider');
 
+  // Favorites state (separate from paginated history)
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+
   // Pagination state
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 12,
+    limit: 9,
     total: 0,
     totalPages: 0,
     hasNextPage: false,
@@ -50,6 +54,7 @@ const Dashboard = () => {
   useEffect(() => {
     fetchHistory(1);
     fetchStats();
+    fetchFavorites();
   }, []);
 
   const fetchHistory = async (page = 1) => {
@@ -85,6 +90,20 @@ const Dashboard = () => {
     }
   };
 
+  const fetchFavorites = async () => {
+    try {
+      setFavoritesLoading(true);
+      const response = await api.get('/history/favorites?limit=100');
+      if (response.data.success) {
+        setFavorites(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch favorites:', error);
+    } finally {
+      setFavoritesLoading(false);
+    }
+  };
+
   // Get unique values for filter dropdowns
   const filterOptions = useMemo(() => {
     const haircuts = [...new Set(history.map(item => item.haircut))].sort();
@@ -95,12 +114,8 @@ const Dashboard = () => {
 
   // Apply filters and search to history
   const filteredHistory = useMemo(() => {
-    let items = history;
-
-    // Filter by tab first
-    if (activeTab === 'favorites') {
-      items = items.filter(item => item.isFavorite);
-    }
+    // Use favorites array when on favorites tab, otherwise use paginated history
+    let items = activeTab === 'favorites' ? favorites : history;
 
     // Apply search query
     if (searchQuery.trim()) {
@@ -131,12 +146,12 @@ const Dashboard = () => {
       if (filters.gender !== 'all' && (item.gender || 'none') !== filters.gender) return false;
       return true;
     });
-  }, [history, filters, activeTab, searchQuery]);
+  }, [history, favorites, filters, activeTab, searchQuery]);
 
-  // Count favorites
+  // Count favorites (use the fetched favorites array length)
   const favoritesCount = useMemo(() => {
-    return history.filter(item => item.isFavorite).length;
-  }, [history]);
+    return favorites.length;
+  }, [favorites]);
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this simulation?')) return;
@@ -264,13 +279,25 @@ const Dashboard = () => {
     try {
       const response = await api.put(`/history/${id}/favorite`);
       if (response.data.success) {
-        // Update local state
+        const newIsFavorite = response.data.data.isFavorite;
+        // Update local history state
         setHistory(history.map(item =>
-          item.id === id ? { ...item, isFavorite: response.data.data.isFavorite } : item
+          item.id === id ? { ...item, isFavorite: newIsFavorite } : item
         ));
+        // Update favorites array
+        if (newIsFavorite) {
+          // Add to favorites if not already there
+          const item = history.find(h => h.id === id) || favorites.find(f => f.id === id);
+          if (item && !favorites.find(f => f.id === id)) {
+            setFavorites([...favorites, { ...item, isFavorite: true }]);
+          }
+        } else {
+          // Remove from favorites
+          setFavorites(favorites.filter(f => f.id !== id));
+        }
         // Update selected image if open
         if (selectedImage && selectedImage.id === id) {
-          setSelectedImage(prev => ({ ...prev, isFavorite: response.data.data.isFavorite }));
+          setSelectedImage(prev => ({ ...prev, isFavorite: newIsFavorite }));
         }
       }
     } catch (error) {
@@ -278,19 +305,39 @@ const Dashboard = () => {
     }
   };
 
+  // Gradient button component
+  const GradientButton = ({ children, onClick, className = '', disabled = false }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`relative group overflow-hidden rounded-xl font-semibold transition-all duration-300 ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25'
+      } ${className}`}
+    >
+      <span className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 bg-[length:200%_100%] group-hover:animate-gradient-x"></span>
+      <span className="relative flex items-center justify-center gap-2">{children}</span>
+    </button>
+  );
+
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-black' : 'bg-gray-100'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
+      {/* Animated background gradient */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className={`absolute -top-40 -right-40 w-80 h-80 ${isDark ? 'bg-purple-600/10' : 'bg-purple-400/20'} rounded-full blur-3xl`}></div>
+        <div className={`absolute top-1/2 -left-40 w-80 h-80 ${isDark ? 'bg-pink-600/10' : 'bg-pink-400/20'} rounded-full blur-3xl`}></div>
+      </div>
+
       {/* Image Modal */}
       {selectedImage && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedImage(null)}
         >
           <div
-            className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto"
+            className={`${isDark ? 'bg-gray-900/95 border-gray-700' : 'bg-white/95 border-gray-200'} backdrop-blur-xl rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-auto border shadow-2xl`}
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+            <div className={`p-4 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => handleToggleFavorite(selectedImage.id)}
@@ -308,13 +355,13 @@ const Dashboard = () => {
                   )}
                 </button>
                 <div>
-                  <h3 className="text-white font-medium">{selectedImage.haircut} - {selectedImage.hairColor}</h3>
-                  <p className="text-gray-400 text-sm">{formatDate(selectedImage.createdAt)} | {formatGender(selectedImage.gender)}</p>
+                  <h3 className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>{selectedImage.haircut} - {selectedImage.hairColor}</h3>
+                  <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>{formatDate(selectedImage.createdAt)} | {formatGender(selectedImage.gender)}</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedImage(null)}
-                className="text-gray-400 hover:text-white"
+                className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'} transition-colors`}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -325,13 +372,13 @@ const Dashboard = () => {
               {/* View Mode Toggle */}
               {!selectedImage.resultImageError && (
                 <div className="flex justify-center mb-4">
-                  <div className="bg-gray-800 rounded-lg p-1 flex gap-1">
+                  <div className={`${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg p-1 flex gap-1`}>
                     <button
                       onClick={() => setModalViewMode('slider')}
                       className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
                         modalViewMode === 'slider'
-                          ? 'bg-white text-black'
-                          : 'text-gray-400 hover:text-white'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                          : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,8 +390,8 @@ const Dashboard = () => {
                       onClick={() => setModalViewMode('sideBySide')}
                       className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
                         modalViewMode === 'sideBySide'
-                          ? 'bg-white text-black'
-                          : 'text-gray-400 hover:text-white'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                          : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -370,7 +417,7 @@ const Dashboard = () => {
                 /* Side by Side View */
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-gray-400 text-sm mb-2">Before</p>
+                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mb-2`}>Before</p>
                     <img
                       src={selectedImage.originalImage}
                       alt="Before"
@@ -378,20 +425,20 @@ const Dashboard = () => {
                     />
                   </div>
                   <div>
-                    <p className="text-gray-400 text-sm mb-2">After</p>
+                    <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm mb-2`}>After</p>
                     {selectedImage.resultImageError ? (
-                      <div className="w-full aspect-square rounded-lg border-2 border-gray-700 bg-gray-800 flex flex-col items-center justify-center text-center p-4">
-                        <svg className="w-12 h-12 text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className={`w-full aspect-square rounded-lg border-2 ${isDark ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-100'} flex flex-col items-center justify-center text-center p-4`}>
+                        <svg className={`w-12 h-12 ${isDark ? 'text-gray-600' : 'text-gray-400'} mb-3`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <p className="text-gray-400 text-sm">Image expired</p>
-                        <p className="text-gray-500 text-xs mt-1">This simulation was saved before the fix</p>
+                        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Image expired</p>
+                        <p className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-xs mt-1`}>This simulation was saved before the fix</p>
                       </div>
                     ) : (
                       <img
                         src={selectedImage.resultImage}
                         alt="After"
-                        className="w-full rounded-lg border-2 border-white"
+                        className="w-full rounded-lg border-2 border-purple-500"
                         onError={() => {
                           setSelectedImage(prev => ({ ...prev, resultImageError: true }));
                         }}
@@ -404,7 +451,7 @@ const Dashboard = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleDownload(selectedImage.originalImage, 'before')}
-                    className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1.5"
+                    className={`${isDark ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors`}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -414,7 +461,7 @@ const Dashboard = () => {
                   {!selectedImage.resultImageError && (
                     <button
                       onClick={() => handleDownload(selectedImage.resultImage, 'after')}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1.5"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-all"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -425,7 +472,7 @@ const Dashboard = () => {
                 </div>
                 <button
                   onClick={() => handleDelete(selectedImage.id)}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                  className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-4 py-2 rounded-lg text-sm transition-all"
                 >
                   Delete
                 </button>
@@ -436,11 +483,11 @@ const Dashboard = () => {
       )}
 
       {/* Responsive Navbar */}
-      <header className={`${isDark ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-40 transition-colors duration-300`}>
+      <header className={`${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'} backdrop-blur-xl border-b sticky top-0 z-40 transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
           <h1
             onClick={() => navigate('/landing')}
-            className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} cursor-pointer hover:opacity-80 transition-opacity`}
+            className={`text-lg md:text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity`}
           >
             AI Hair Simulation
           </h1>
@@ -455,6 +502,13 @@ const Dashboard = () => {
             </button>
             <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
             <button
+              onClick={() => navigate('/dashboard')}
+              className={`text-purple-500 font-medium transition-colors text-sm`}
+            >
+              Dashboard
+            </button>
+            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
+            <button
               onClick={() => navigate('/profile')}
               className={`flex items-center gap-2 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
             >
@@ -462,7 +516,7 @@ const Dashboard = () => {
                 <img
                   src={user.profileImage}
                   alt=""
-                  className="w-6 h-6 rounded-full object-cover"
+                  className="w-6 h-6 rounded-full object-cover ring-2 ring-purple-500/50"
                 />
               ) : (
                 <div className={`w-6 h-6 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
@@ -498,7 +552,7 @@ const Dashboard = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className={`md:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-t px-4 py-3 space-y-3`}>
+          <div className={`md:hidden ${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-gray-200'} backdrop-blur-xl border-t px-4 py-3 space-y-3`}>
             <button
               onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
               className={`flex items-center gap-2 w-full text-left ${isDark ? 'text-white' : 'text-gray-900'} py-2 text-sm`}
@@ -523,6 +577,12 @@ const Dashboard = () => {
               Simulation
             </button>
             <button
+              onClick={() => setMobileMenuOpen(false)}
+              className={`block w-full text-left text-purple-500 font-medium py-2 text-sm`}
+            >
+              Dashboard
+            </button>
+            <button
               onClick={handleLogout}
               className={`block w-full ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg text-sm text-center`}
             >
@@ -533,45 +593,48 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
+      <main className="relative max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
         {/* Hero Section */}
-        <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-lg p-6 md:p-8 mb-6 md:mb-8 transition-colors duration-300`}>
+        <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl border rounded-2xl p-6 md:p-8 mb-6 md:mb-8 transition-colors duration-300`}>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h2 className={`text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
-                Welcome back, {user?.username}
+                Welcome back, <span className="bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">{user?.username}</span>
               </h2>
               <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-base md:text-lg`}>
                 Transform your look with AI-powered haircut simulation
               </p>
             </div>
-            <button
+            <GradientButton
               onClick={() => navigate('/simulation')}
-              className={`${isDark ? 'bg-white hover:bg-gray-200 text-black' : 'bg-gray-900 hover:bg-gray-800 text-white'} font-medium px-6 py-3 rounded-lg transition-colors text-sm md:text-base`}
+              className="px-6 py-3 text-white text-sm md:text-base"
             >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
               New Simulation
-            </button>
+            </GradientButton>
           </div>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-          <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-lg p-4 md:p-6 transition-colors duration-300`}>
+          <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl border rounded-2xl p-4 md:p-6 transition-all duration-300 hover:scale-105`}>
             <p className={`text-xs md:text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Saved</p>
-            <p className={`text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{stats.totalSimulations}</p>
+            <p className={`text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent`}>{stats.totalSimulations}</p>
           </div>
-          <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-lg p-4 md:p-6 transition-colors duration-300`}>
+          <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl border rounded-2xl p-4 md:p-6 transition-all duration-300 hover:scale-105`}>
             <p className={`text-xs md:text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Favorites</p>
             <p className="text-2xl md:text-3xl font-bold text-yellow-500">{favoritesCount}</p>
           </div>
-          <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-lg p-4 md:p-6 transition-colors duration-300`}>
+          <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl border rounded-2xl p-4 md:p-6 transition-all duration-300 hover:scale-105`}>
             <p className={`text-xs md:text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Status</p>
             <p className="text-2xl md:text-3xl font-bold text-green-500">Active</p>
           </div>
         </div>
 
         {/* History Grid */}
-        <div className={`${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-lg p-4 md:p-6 transition-colors duration-300`}>
+        <div className={`${isDark ? 'bg-gray-900/50 border-gray-800' : 'bg-white/50 border-gray-200'} backdrop-blur-xl border rounded-2xl p-4 md:p-6 transition-colors duration-300`}>
           {/* Search Bar */}
           {history.length > 0 && (
             <div className="mb-4">
@@ -589,7 +652,7 @@ const Dashboard = () => {
                   placeholder="Search by haircut, color, or date..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full ${isDark ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-500' : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400'} border pl-10 pr-10 py-2.5 rounded-lg text-sm focus:outline-none ${isDark ? 'focus:border-gray-500' : 'focus:border-gray-400'}`}
+                  className={`w-full ${isDark ? 'bg-gray-800/50 border-gray-700 text-white placeholder-gray-500' : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400'} border pl-10 pr-10 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all`}
                 />
                 {hasActiveSearch && (
                   <button
@@ -611,7 +674,7 @@ const Dashboard = () => {
               onClick={() => setActiveTab('all')}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === 'all'
-                  ? isDark ? 'text-white border-white' : 'text-gray-900 border-gray-900'
+                  ? 'text-purple-500 border-purple-500'
                   : isDark ? 'text-gray-400 border-transparent hover:text-gray-300' : 'text-gray-500 border-transparent hover:text-gray-700'
               }`}
             >
@@ -655,9 +718,9 @@ const Dashboard = () => {
                 {/* Filter Button */}
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
                     showFilters || activeFiltersCount > 0
-                      ? isDark ? 'bg-white text-black' : 'bg-gray-900 text-white'
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                       : isDark ? 'bg-gray-800 text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -666,7 +729,7 @@ const Dashboard = () => {
                   </svg>
                   Filter
                   {activeFiltersCount > 0 && (
-                    <span className={`${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} text-xs px-1.5 py-0.5 rounded-full`}>
+                    <span className="bg-white text-purple-600 text-xs px-1.5 py-0.5 rounded-full font-medium">
                       {activeFiltersCount}
                     </span>
                   )}
@@ -694,7 +757,7 @@ const Dashboard = () => {
 
           {/* Filter Panel */}
           {showFilters && (
-            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'} rounded-lg p-4 mb-4 border`}>
+            <div className={`${isDark ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-200'} rounded-xl p-4 mb-4 border`}>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Haircut Filter */}
                 <div>
@@ -702,7 +765,7 @@ const Dashboard = () => {
                   <select
                     value={filters.haircut}
                     onChange={(e) => setFilters(f => ({ ...f, haircut: e.target.value }))}
-                    className="w-full bg-gray-900 border border-gray-600 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-gray-500"
+                    className={`w-full ${isDark ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} border px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50`}
                   >
                     <option value="all">All Haircuts</option>
                     {filterOptions.haircuts.map(haircut => (
@@ -713,11 +776,11 @@ const Dashboard = () => {
 
                 {/* Hair Color Filter */}
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Hair Color</label>
+                  <label className={`block text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Hair Color</label>
                   <select
                     value={filters.hairColor}
                     onChange={(e) => setFilters(f => ({ ...f, hairColor: e.target.value }))}
-                    className="w-full bg-gray-900 border border-gray-600 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-gray-500"
+                    className={`w-full ${isDark ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} border px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50`}
                   >
                     <option value="all">All Colors</option>
                     {filterOptions.hairColors.map(color => (
@@ -728,11 +791,11 @@ const Dashboard = () => {
 
                 {/* Gender Filter */}
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Gender</label>
+                  <label className={`block text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1`}>Gender</label>
                   <select
                     value={filters.gender}
                     onChange={(e) => setFilters(f => ({ ...f, gender: e.target.value }))}
-                    className="w-full bg-gray-900 border border-gray-600 text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-gray-500"
+                    className={`w-full ${isDark ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} border px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50`}
                   >
                     <option value="all">All</option>
                     {filterOptions.genders.map(gender => (
@@ -745,7 +808,7 @@ const Dashboard = () => {
               {activeFiltersCount > 0 && (
                 <button
                   onClick={clearFilters}
-                  className="mt-3 text-sm text-gray-400 hover:text-white transition-colors"
+                  className={`mt-3 text-sm ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'} transition-colors`}
                 >
                   Clear all filters
                 </button>
@@ -755,25 +818,25 @@ const Dashboard = () => {
 
           {/* Select Mode Actions */}
           {selectMode && (
-            <div className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-3 mb-4 border border-gray-700">
+            <div className={`flex items-center justify-between ${isDark ? 'bg-gray-800/50' : 'bg-gray-100'} rounded-xl px-4 py-3 mb-4 border ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
               <div className="flex items-center gap-3">
                 <button
                   onClick={toggleSelectAll}
-                  className="text-sm text-gray-300 hover:text-white transition-colors"
+                  className={`text-sm ${isDark ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-gray-900'} transition-colors`}
                 >
                   {selectedItems.size === filteredHistory.length ? 'Deselect All' : 'Select All'}
                 </button>
-                <span className="text-gray-500 text-sm">
+                <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-sm`}>
                   {selectedItems.size} selected
                 </span>
               </div>
               <button
                 onClick={handleBulkDelete}
                 disabled={selectedItems.size === 0 || isDeleting}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm transition-colors ${
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm transition-all ${
                   selectedItems.size === 0 || isDeleting
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700 text-white'
+                    ? isDark ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white'
                 }`}
               >
                 {isDeleting ? (
@@ -793,30 +856,30 @@ const Dashboard = () => {
             </div>
           )}
 
-          {isLoading ? (
+          {(isLoading || (activeTab === 'favorites' && favoritesLoading)) ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4 opacity-50">📭</div>
-              <p className="text-gray-400 text-lg">No saved simulations yet</p>
-              <p className="text-gray-500 text-sm mt-2">Generate and save your first hairstyle</p>
-              <button
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-lg`}>No saved simulations yet</p>
+              <p className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-sm mt-2`}>Generate and save your first hairstyle</p>
+              <GradientButton
                 onClick={() => navigate('/simulation')}
-                className="mt-4 bg-white hover:bg-gray-200 text-black font-medium px-6 py-2 rounded-lg transition-colors text-sm"
+                className="mt-4 px-6 py-2 text-white text-sm"
               >
                 Start Now
-              </button>
+              </GradientButton>
             </div>
           ) : filteredHistory.length === 0 && activeTab === 'favorites' ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4 opacity-50">⭐</div>
-              <p className="text-gray-400 text-lg">No favorites yet</p>
-              <p className="text-gray-500 text-sm mt-2">Click the star icon on any simulation to add it to favorites</p>
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-lg`}>No favorites yet</p>
+              <p className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-sm mt-2`}>Click the star icon on any simulation to add it to favorites</p>
               <button
                 onClick={() => setActiveTab('all')}
-                className="mt-4 bg-gray-800 hover:bg-gray-700 text-white font-medium px-6 py-2 rounded-lg transition-colors text-sm"
+                className={`mt-4 ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} font-medium px-6 py-2 rounded-lg transition-colors text-sm`}
               >
                 View All History
               </button>
@@ -824,15 +887,15 @@ const Dashboard = () => {
           ) : filteredHistory.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4 opacity-50">🔍</div>
-              <p className="text-gray-400 text-lg">No results found</p>
-              <p className="text-gray-500 text-sm mt-2">
+              <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-lg`}>No results found</p>
+              <p className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-sm mt-2`}>
                 {hasActiveSearch
                   ? `No simulations match "${searchQuery}"`
                   : 'Try adjusting your filters'}
               </p>
               <button
                 onClick={clearFilters}
-                className="mt-4 bg-gray-800 hover:bg-gray-700 text-white font-medium px-6 py-2 rounded-lg transition-colors text-sm"
+                className={`mt-4 ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} font-medium px-6 py-2 rounded-lg transition-colors text-sm`}
               >
                 {hasActiveSearch ? 'Clear Search' : 'Clear Filters'}
               </button>
@@ -844,10 +907,10 @@ const Dashboard = () => {
                   <div
                     key={item.id}
                     onClick={() => !selectMode && setSelectedImage(item)}
-                    className={`relative cursor-pointer group bg-gray-800 rounded-lg overflow-hidden border transition-colors ${
+                    className={`relative cursor-pointer group ${isDark ? 'bg-gray-800/50' : 'bg-white'} rounded-xl overflow-hidden border transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/10 ${
                       selectMode && selectedItems.has(item.id)
-                        ? 'border-white'
-                        : 'border-gray-700 hover:border-white'
+                        ? 'border-purple-500 ring-2 ring-purple-500/50'
+                        : isDark ? 'border-gray-700 hover:border-purple-500/50' : 'border-gray-200 hover:border-purple-500/50'
                     }`}
                   >
                     {/* Selection Checkbox */}
@@ -858,11 +921,11 @@ const Dashboard = () => {
                       >
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
                           selectedItems.has(item.id)
-                            ? 'bg-white border-white'
-                            : 'border-gray-400 bg-black/50 hover:border-white'
+                            ? 'bg-purple-500 border-purple-500'
+                            : isDark ? 'border-gray-400 bg-black/50 hover:border-purple-400' : 'border-gray-400 bg-white/50 hover:border-purple-400'
                         }`}>
                           {selectedItems.has(item.id) && (
-                            <svg className="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                             </svg>
                           )}
@@ -878,7 +941,7 @@ const Dashboard = () => {
                           alt="Before"
                           className="w-full h-full object-cover"
                         />
-                        <span className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">Before</span>
+                        <span className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-lg">Before</span>
                       </div>
                       <div className="w-1/2 aspect-square relative">
                         <img
@@ -890,13 +953,13 @@ const Dashboard = () => {
                             e.target.nextElementSibling?.classList.remove('hidden');
                           }}
                         />
-                        <div className="hidden absolute inset-0 bg-gray-900 flex flex-col items-center justify-center text-center p-2">
-                          <svg className="w-8 h-8 text-gray-600 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className={`hidden absolute inset-0 ${isDark ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col items-center justify-center text-center p-2`}>
+                          <svg className={`w-8 h-8 ${isDark ? 'text-gray-600' : 'text-gray-400'} mb-1`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span className="text-gray-500 text-xs">Expired</span>
+                          <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-xs`}>Expired</span>
                         </div>
-                        <span className="absolute top-2 right-2 bg-white/90 text-black text-xs px-2 py-1 rounded font-medium">After</span>
+                        <span className="absolute top-2 right-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded-lg font-medium">After</span>
                       </div>
                     </div>
                     {/* Favorite Button on Card */}
@@ -906,7 +969,7 @@ const Dashboard = () => {
                         className={`absolute top-2 right-2 z-10 p-1.5 rounded-full transition-all ${
                           item.isFavorite
                             ? 'bg-yellow-400 text-black'
-                            : 'bg-black/50 text-gray-400 hover:text-yellow-400 opacity-0 group-hover:opacity-100'
+                            : `${isDark ? 'bg-black/50 text-gray-400' : 'bg-white/50 text-gray-500'} hover:text-yellow-400 opacity-0 group-hover:opacity-100`
                         }`}
                         title={item.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                       >
@@ -917,9 +980,9 @@ const Dashboard = () => {
                     )}
 
                     {/* Info */}
-                    <div className="p-3 border-t border-gray-700">
+                    <div className={`p-3 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                       <div className="flex items-center justify-between">
-                        <p className="text-white text-sm font-medium truncate flex-1">{item.haircut}</p>
+                        <p className={`${isDark ? 'text-white' : 'text-gray-900'} text-sm font-medium truncate flex-1`}>{item.haircut}</p>
                         {item.isFavorite && (
                           <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 ml-1" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -927,8 +990,8 @@ const Dashboard = () => {
                         )}
                       </div>
                       <div className="flex justify-between items-center mt-1">
-                        <p className="text-gray-400 text-xs truncate">{item.hairColor}</p>
-                        <p className="text-gray-500 text-xs">{formatDate(item.createdAt)}</p>
+                        <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs truncate`}>{item.hairColor}</p>
+                        <p className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-xs`}>{formatDate(item.createdAt)}</p>
                       </div>
                     </div>
                   </div>
@@ -938,7 +1001,7 @@ const Dashboard = () => {
               {/* Pagination Controls */}
               {pagination.totalPages > 1 && (
                 <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <p className="text-gray-400 text-sm">
+                  <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>
                     Showing {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
                   </p>
                   <div className="flex items-center gap-2">
@@ -946,10 +1009,10 @@ const Dashboard = () => {
                     <button
                       onClick={() => handlePageChange(pagination.page - 1)}
                       disabled={!pagination.hasPrevPage}
-                      className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors ${
+                      className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-all ${
                         pagination.hasPrevPage
-                          ? 'bg-gray-800 text-white hover:bg-gray-700'
-                          : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                          ? isDark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                          : isDark ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -970,14 +1033,14 @@ const Dashboard = () => {
                             <button
                               key={1}
                               onClick={() => handlePageChange(1)}
-                              className="w-10 h-10 rounded-lg text-sm bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                              className={`w-10 h-10 rounded-lg text-sm ${isDark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'} transition-colors`}
                             >
                               1
                             </button>
                           );
                           if (page > 4) {
                             pages.push(
-                              <span key="dots1" className="text-gray-500 px-1">...</span>
+                              <span key="dots1" className={`${isDark ? 'text-gray-500' : 'text-gray-400'} px-1`}>...</span>
                             );
                           }
                         }
@@ -988,10 +1051,10 @@ const Dashboard = () => {
                             <button
                               key={i}
                               onClick={() => handlePageChange(i)}
-                              className={`w-10 h-10 rounded-lg text-sm transition-colors ${
+                              className={`w-10 h-10 rounded-lg text-sm transition-all ${
                                 i === page
-                                  ? 'bg-white text-black font-medium'
-                                  : 'bg-gray-800 text-white hover:bg-gray-700'
+                                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium'
+                                  : isDark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
                               }`}
                             >
                               {i}
@@ -1003,14 +1066,14 @@ const Dashboard = () => {
                         if (page < totalPages - 2) {
                           if (page < totalPages - 3) {
                             pages.push(
-                              <span key="dots2" className="text-gray-500 px-1">...</span>
+                              <span key="dots2" className={`${isDark ? 'text-gray-500' : 'text-gray-400'} px-1`}>...</span>
                             );
                           }
                           pages.push(
                             <button
                               key={totalPages}
                               onClick={() => handlePageChange(totalPages)}
-                              className="w-10 h-10 rounded-lg text-sm bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+                              className={`w-10 h-10 rounded-lg text-sm ${isDark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'} transition-colors`}
                             >
                               {totalPages}
                             </button>
@@ -1025,10 +1088,10 @@ const Dashboard = () => {
                     <button
                       onClick={() => handlePageChange(pagination.page + 1)}
                       disabled={!pagination.hasNextPage}
-                      className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-colors ${
+                      className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1 transition-all ${
                         pagination.hasNextPage
-                          ? 'bg-gray-800 text-white hover:bg-gray-700'
-                          : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                          ? isDark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                          : isDark ? 'bg-gray-800/50 text-gray-600 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       }`}
                     >
                       Next
@@ -1043,6 +1106,17 @@ const Dashboard = () => {
           )}
         </div>
       </main>
+
+      {/* Add gradient animation keyframes */}
+      <style>{`
+        @keyframes gradient-x {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        .animate-gradient-x {
+          animation: gradient-x 3s ease infinite;
+        }
+      `}</style>
     </div>
   );
 };

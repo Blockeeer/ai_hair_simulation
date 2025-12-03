@@ -27,6 +27,9 @@ const Landing = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
 
+  // Mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Scroll animation states
   const [visibleSections, setVisibleSections] = useState({});
 
@@ -367,9 +370,53 @@ const Landing = () => {
               </button>
 
               {isAuthenticated ? (
-                <AnimatedButton onClick={() => navigate('/simulation')} className="px-5 py-2.5 rounded-xl text-sm">
-                  Go to Simulation
-                </AnimatedButton>
+                <>
+                  {/* Desktop Nav */}
+                  <div className="hidden md:flex items-center space-x-3">
+                    <button
+                      onClick={() => navigate('/simulation')}
+                      className={`${textSecondary} hover:text-purple-400 transition-colors px-3 py-2 text-sm font-medium`}
+                    >
+                      Simulation
+                    </button>
+                    <button
+                      onClick={() => navigate('/dashboard')}
+                      className={`${textSecondary} hover:text-purple-400 transition-colors px-3 py-2 text-sm font-medium`}
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => navigate('/profile')}
+                      className={`flex items-center gap-2 ${textSecondary} hover:text-purple-400 transition-colors px-3 py-2 text-sm font-medium`}
+                    >
+                      {user?.profileImage ? (
+                        <img src={user.profileImage} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      )}
+                      {user?.username}
+                    </button>
+                    <AnimatedButton onClick={() => navigate('/simulation')} className="px-5 py-2.5 rounded-xl text-sm">
+                      Try Now
+                    </AnimatedButton>
+                  </div>
+
+                  {/* Mobile Menu Button */}
+                  <button
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className={`md:hidden ${isDark ? 'text-white' : 'text-gray-900'} p-2`}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {mobileMenuOpen ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      )}
+                    </svg>
+                  </button>
+                </>
               ) : (
                 <>
                   <button
@@ -386,6 +433,43 @@ const Landing = () => {
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isAuthenticated && mobileMenuOpen && (
+          <div className={`md:hidden ${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-gray-200'} backdrop-blur-xl border-t px-4 py-3 space-y-2`}>
+            <button
+              onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
+              className={`flex items-center gap-2 w-full text-left ${isDark ? 'text-white' : 'text-gray-900'} py-2 text-sm`}
+            >
+              {user?.profileImage ? (
+                <img src={user.profileImage} alt="" className="w-6 h-6 rounded-full object-cover" />
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              )}
+              {user?.username}
+            </button>
+            <button
+              onClick={() => { navigate('/simulation'); setMobileMenuOpen(false); }}
+              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
+            >
+              Simulation
+            </button>
+            <button
+              onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
+              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => { navigate('/simulation'); setMobileMenuOpen(false); }}
+              className="block w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2.5 rounded-xl text-sm text-center font-medium"
+            >
+              Try Now
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -538,17 +622,11 @@ const Landing = () => {
                   <img src={imgBefore} alt="Before" className="w-full h-full object-cover" />
                 </div>
 
-                {/* Slider Handle */}
+                {/* Slider Line */}
                 <div
-                  className="absolute top-0 bottom-0 w-1 bg-white/80 cursor-ew-resize"
-                  style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
-                >
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-14 h-14 bg-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform border-4 border-purple-500">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-                    </svg>
-                  </div>
-                </div>
+                  className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] cursor-ew-resize"
+                  style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)', willChange: 'left' }}
+                />
 
                 {/* Labels */}
                 <div className="absolute bottom-4 left-4 px-4 py-2 bg-black/70 backdrop-blur-sm rounded-xl text-white text-sm font-medium">

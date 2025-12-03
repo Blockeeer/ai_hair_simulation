@@ -1,9 +1,22 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 const ImageCompareSlider = ({ beforeImage, afterImage, beforeLabel = 'Before', afterLabel = 'After' }) => {
   const [sliderPosition, setSliderPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef(null);
+  const sliderRef = useRef(null);
+  const beforeClipRef = useRef(null);
+
+  const updateSliderPosition = useCallback((percentage) => {
+    // Direct DOM manipulation for instant response
+    if (sliderRef.current) {
+      sliderRef.current.style.left = `${percentage}%`;
+    }
+    if (beforeClipRef.current) {
+      beforeClipRef.current.style.width = `${percentage}%`;
+    }
+    setSliderPosition(percentage);
+  }, []);
 
   const handleMove = useCallback((clientX) => {
     if (!containerRef.current) return;
@@ -11,29 +24,46 @@ const ImageCompareSlider = ({ beforeImage, afterImage, beforeLabel = 'Before', a
     const rect = containerRef.current.getBoundingClientRect();
     const x = clientX - rect.left;
     const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    setSliderPosition(percentage);
-  }, []);
+    updateSliderPosition(percentage);
+  }, [updateSliderPosition]);
+
+  // Use document-level mouse events for smoother tracking
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      handleMove(e.clientX);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMove]);
 
   const handleMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging) return;
     handleMove(e.clientX);
   };
 
   const handleTouchStart = (e) => {
     setIsDragging(true);
+    handleMove(e.touches[0].clientX);
   };
 
   const handleTouchMove = (e) => {
     if (!isDragging) return;
+    e.preventDefault();
     handleMove(e.touches[0].clientX);
   };
 
@@ -41,20 +71,14 @@ const ImageCompareSlider = ({ beforeImage, afterImage, beforeLabel = 'Before', a
     setIsDragging(false);
   };
 
-  const handleClick = (e) => {
-    handleMove(e.clientX);
-  };
-
   return (
     <div
       ref={containerRef}
       className="relative w-full aspect-square select-none cursor-ew-resize overflow-hidden rounded-lg border border-gray-700"
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      onClick={handleClick}
     >
       {/* After Image (Background) */}
       <div className="absolute inset-0">
@@ -65,13 +89,14 @@ const ImageCompareSlider = ({ beforeImage, afterImage, beforeLabel = 'Before', a
           draggable={false}
         />
         {/* After Label */}
-        <span className="absolute top-3 right-3 bg-white/90 text-black text-xs px-2 py-1 rounded font-medium">
+        <span className="absolute top-3 right-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1 rounded font-medium">
           {afterLabel}
         </span>
       </div>
 
       {/* Before Image (Clipped) */}
       <div
+        ref={beforeClipRef}
         className="absolute inset-0 overflow-hidden"
         style={{ width: `${sliderPosition}%` }}
       >
@@ -91,27 +116,19 @@ const ImageCompareSlider = ({ beforeImage, afterImage, beforeLabel = 'Before', a
         </span>
       </div>
 
-      {/* Slider Line */}
+      {/* Slider Handle */}
       <div
-        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg"
+        ref={sliderRef}
+        className="absolute top-0 bottom-0 w-1 bg-white/80 pointer-events-none"
         style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
       >
-        {/* Slider Handle */}
-        <div
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center cursor-ew-resize transition-transform ${
-            isDragging ? 'scale-110' : 'hover:scale-105'
-          }`}
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleTouchStart}
-        >
-          <div className="flex items-center gap-0.5">
-            <svg className="w-3 h-3 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z" />
-            </svg>
-            <svg className="w-3 h-3 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
-            </svg>
-          </div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border-2 border-purple-500 gap-0.5">
+          <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+          </svg>
+          <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+          </svg>
         </div>
       </div>
 
