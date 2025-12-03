@@ -438,7 +438,12 @@ const Dashboard = () => {
       {/* Responsive Navbar */}
       <header className={`${isDark ? 'bg-black border-gray-800' : 'bg-white border-gray-200'} border-b sticky top-0 z-40 transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
-          <h1 className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>AI Hair Simulation</h1>
+          <h1
+            onClick={() => navigate('/landing')}
+            className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} cursor-pointer hover:opacity-80 transition-opacity`}
+          >
+            AI Hair Simulation
+          </h1>
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-4">
