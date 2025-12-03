@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import ImageCompareSlider from '../components/ImageCompareSlider';
 import api from '../utils/api';
 import ImageCropModal from '../components/ImageCropModal';
+import CameraModal from '../components/CameraModal';
 import creditsIcon from '../assets/credits.png';
 
 const Simulation = () => {
@@ -19,6 +20,7 @@ const Simulation = () => {
   const [success, setSuccess] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [rawImage, setRawImage] = useState(null);
   const [viewMode, setViewMode] = useState('slider'); // 'slider' or 'sideBySide'
   const [isSaved, setIsSaved] = useState(false); // Track if current result is saved
@@ -362,6 +364,12 @@ const Simulation = () => {
     setRawImage(null);
   };
 
+  const handleCameraCapture = (imageData) => {
+    // Camera captured image goes through crop modal
+    setRawImage(imageData);
+    setShowCropModal(true);
+  };
+
   const handleRemoveImage = () => {
     setUploadedImage(null);
     setResultImage(null);
@@ -616,6 +624,14 @@ const Simulation = () => {
           cropSize={512}
         />
       )}
+
+      {/* Camera Modal */}
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={handleCameraCapture}
+        isDark={isDark}
+      />
 
       {/* Credit Packages Modal */}
       {showPricingModal && (
@@ -894,7 +910,7 @@ const Simulation = () => {
           {!uploadedImage ? (
             /* Upload Area */
             <div className="text-center w-full max-w-sm">
-              <div className={`border-2 border-dashed ${isDark ? 'border-gray-700 hover:border-gray-600' : 'border-gray-300 hover:border-gray-400'} rounded-lg p-6 md:p-12 transition-colors`}>
+              <div className={`border-2 border-dashed ${isDark ? 'border-gray-700 hover:border-gray-600' : 'border-gray-300 hover:border-gray-400'} rounded-lg p-6 md:p-8 transition-colors`}>
                 <input
                   type="file"
                   accept="image/*"
@@ -902,30 +918,75 @@ const Simulation = () => {
                   className="hidden"
                   id="file-upload"
                 />
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer flex flex-col items-center"
-                >
-                  <svg
-                    className={`w-12 h-12 md:w-16 md:h-16 ${isDark ? 'text-gray-600' : 'text-gray-400'} mb-3 md:mb-4`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+
+                {/* Upload and Camera buttons */}
+                <div className="flex flex-col items-center gap-4">
+                  {/* Upload Button */}
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer flex flex-col items-center group"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                  <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium mb-1 text-sm md:text-base`}>
-                    Tap to upload photo
-                  </span>
-                  <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs md:text-sm`}>
+                    <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl ${isDark ? 'bg-gray-800 group-hover:bg-gray-700' : 'bg-gray-100 group-hover:bg-gray-200'} flex items-center justify-center mb-2 transition-all duration-300 group-hover:scale-105`}>
+                      <svg
+                        className={`w-8 h-8 md:w-10 md:h-10 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                    <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium text-sm`}>
+                      Upload Photo
+                    </span>
+                  </label>
+
+                  <div className={`flex items-center gap-3 w-full`}>
+                    <div className={`flex-1 h-px ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                    <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>or</span>
+                    <div className={`flex-1 h-px ${isDark ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                  </div>
+
+                  {/* Camera Button */}
+                  <button
+                    onClick={() => setShowCameraModal(true)}
+                    className="flex flex-col items-center group"
+                  >
+                    <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 flex items-center justify-center mb-2 transition-all duration-300 group-hover:scale-105 shadow-lg`}>
+                      <svg
+                        className="w-8 h-8 md:w-10 md:h-10 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    </div>
+                    <span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium text-sm`}>
+                      Take Photo
+                    </span>
+                  </button>
+
+                  <span className={`${isDark ? 'text-gray-500' : 'text-gray-500'} text-xs mt-2`}>
                     PNG, JPG up to 10MB
                   </span>
-                </label>
+                </div>
               </div>
             </div>
           ) : !resultImage ? (

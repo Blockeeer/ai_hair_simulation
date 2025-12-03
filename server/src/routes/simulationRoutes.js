@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { generateSimulation, checkStatus, getQueueStatus, trialGenerate, getGenerationLimit } = require('../controllers/simulationController');
+const { generateSimulation, checkStatus, getQueueStatus, trialGenerate, getGenerationLimit, getCacheStats } = require('../controllers/simulationController');
 const { protect } = require('../middleware/auth');
 
 // Configure multer for file uploads
@@ -18,5 +18,6 @@ router.post('/generate', protect, generateSimulation);
 router.get('/status/:predictionId', protect, checkStatus);
 router.get('/queue-status', protect, getQueueStatus);
 router.get('/generation-limit', protect, getGenerationLimit);
+router.get('/cache-stats', protect, getCacheStats);
 
 module.exports = router;

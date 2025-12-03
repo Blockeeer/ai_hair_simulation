@@ -1,6 +1,7 @@
 const aiService = require('../services/aiService');
 const geminiService = require('../services/geminiService');
 const queueService = require('../services/queueService');
+const cacheService = require('../services/cacheService');
 const crypto = require('crypto');
 const userService = require('../services/userService');
 
@@ -64,39 +65,66 @@ const generateSimulation = async (req, res) => {
       }
     }
 
-    // Add job to queue and get position info
-    const queueInfo = queueService.addJob(jobId, userId || 'anonymous');
-    console.log('Job ' + jobId + ' added to queue. Position: ' + queueInfo.position + ', Est. wait: ' + queueInfo.estimatedWaitTime + 's');
-
     // Determine which model to use (default to replicate)
     const selectedModel = model || 'replicate';
     console.log('Using AI model:', selectedModel);
 
-    let result;
+    // Check cache first
+    const cacheParams = {
+      imageBase64,
+      haircut: haircut || (selectedModel === 'gemini' ? 'natural waves' : 'Random'),
+      hairColor: hair_color || (selectedModel === 'gemini' ? 'natural' : 'Random'),
+      aiModel: selectedModel,
+      gender: gender || 'none'
+    };
 
-    if (selectedModel === 'gemini') {
-      // Use Gemini AI
-      const options = {
-        haircut: haircut || 'natural waves',
-        hair_color: hair_color || 'natural'
-      };
-      console.log('Generating simulation with Gemini, options:', options);
-      result = await geminiService.changeHaircut(imageBase64, options);
+    const cacheCheck = await cacheService.isCached(cacheParams);
+
+    let result;
+    let fromCache = false;
+
+    if (cacheCheck.isCached) {
+      // Return cached result - no API call needed!
+      console.log('Cache HIT - returning cached result');
+      result = cacheCheck.cachedData.resultImageUrl;
+      fromCache = true;
     } else {
-      // Use Replicate (default)
-      const options = {
-        haircut: haircut || 'Random',
-        hair_color: hair_color || 'Random',
-        gender: gender || 'none'
-      };
-      console.log('Generating simulation with Replicate, options:', options);
-      result = await aiService.changeHaircut(imageBase64, options);
+      // No cache hit - call AI API
+      // Add job to queue and get position info
+      const queueInfo = queueService.addJob(jobId, userId || 'anonymous');
+      console.log('Job ' + jobId + ' added to queue. Position: ' + queueInfo.position + ', Est. wait: ' + queueInfo.estimatedWaitTime + 's');
+
+      if (selectedModel === 'gemini') {
+        // Use Gemini AI
+        const options = {
+          haircut: haircut || 'natural waves',
+          hair_color: hair_color || 'natural'
+        };
+        console.log('Generating simulation with Gemini, options:', options);
+        result = await geminiService.changeHaircut(imageBase64, options);
+      } else {
+        // Use Replicate (default)
+        const options = {
+          haircut: haircut || 'Random',
+          hair_color: hair_color || 'Random',
+          gender: gender || 'none'
+        };
+        console.log('Generating simulation with Replicate, options:', options);
+        result = await aiService.changeHaircut(imageBase64, options);
+      }
+
+      // Remove job from queue (success)
+      queueService.removeJob(jobId, true);
+
+      // Cache the result for future requests
+      await cacheService.cacheGeneration({
+        ...cacheParams,
+        imageHash: cacheCheck.imageHash
+      }, result);
     }
 
-    // Remove job from queue (success)
-    queueService.removeJob(jobId, true);
-
-    // Increment generation count for logged-in users (unless they used a credit)
+    // Increment generation count for logged-in users (unless they used a credit or got cached result)
+    // Note: Cached results still count as a generation to prevent abuse
     if (userId && !usedCredit) {
       await userService.incrementGenerationCount(userId);
     }
@@ -106,18 +134,19 @@ const generateSimulation = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Simulation generated successfully',
+      message: fromCache ? 'Simulation retrieved from cache' : 'Simulation generated successfully',
       data: {
         originalImage: imageBase64,
         resultImage: result,
         model: selectedModel,
         options: { haircut, hair_color, gender },
         usedCredit,
-        generationInfo: updatedGenerationInfo
+        generationInfo: updatedGenerationInfo,
+        fromCache
       }
     });
   } catch (error) {
-    // Remove job from queue (failure)
+    // Remove job from queue (failure) - only if we started processing
     queueService.removeJob(jobId, false);
 
     console.error('Simulation generation error:', error);
@@ -340,10 +369,29 @@ function formatWaitTime(seconds) {
   }
 }
 
+// Get cache statistics (admin endpoint)
+const getCacheStats = async (req, res) => {
+  try {
+    const stats = cacheService.getStats();
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Cache stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get cache stats'
+    });
+  }
+};
+
 module.exports = {
   generateSimulation,
   trialGenerate,
   getGenerationLimit,
   checkStatus,
-  getQueueStatus
+  getQueueStatus,
+  getCacheStats
 };
