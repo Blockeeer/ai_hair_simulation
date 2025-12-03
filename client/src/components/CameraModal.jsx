@@ -3,38 +3,66 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const [stream, setStream] = useState(null);
+  const streamRef = useRef(null);
   const [error, setError] = useState('');
   const [facingMode, setFacingMode] = useState('user'); // 'user' for front camera, 'environment' for back
   const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const [countdown, setCountdown] = useState(null);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsReady(false);
+  }, []);
 
   const startCamera = useCallback(async () => {
     setIsLoading(true);
     setError('');
+    setIsReady(false);
 
     try {
-      // Stop any existing stream
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      // Stop any existing stream first
+      stopCamera();
 
       const constraints = {
         video: {
           facingMode: facingMode,
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 960 }
         },
         audio: false
       };
 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(mediaStream);
+      streamRef.current = mediaStream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play();
+
+        // Wait for video to be ready to play
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            await videoRef.current.play();
+            // Wait a bit for the first frames to render
+            setTimeout(() => {
+              setIsLoading(false);
+              setIsReady(true);
+            }, 500);
+          } catch (playError) {
+            console.error('Video play error:', playError);
+            setError('Failed to start video preview');
+            setIsLoading(false);
+          }
+        };
+
+        videoRef.current.onerror = () => {
+          setError('Video stream error');
           setIsLoading(false);
         };
       }
@@ -51,7 +79,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
         setError('Failed to access camera. Please try again.');
       }
     }
-  }, [facingMode, stream]);
+  }, [facingMode, stopCamera]);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,9 +87,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
     }
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopCamera();
     };
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -73,6 +99,8 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
   }, [facingMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCapture = () => {
+    if (!isReady) return;
+
     // Start countdown
     setCountdown(3);
 
@@ -89,26 +117,46 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
   };
 
   const captureImage = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      console.error('Video or canvas ref not available');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
 
+    // Check if video has valid dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.error('Video dimensions not available');
+      setError('Camera not ready. Please try again.');
+      setCountdown(null);
+      return;
+    }
+
     // Set canvas size to match video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
+    // Handle mirror effect for front camera
+    if (facingMode === 'user') {
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+    }
+
     // Draw the video frame to canvas
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    // Reset transformation
+    if (facingMode === 'user') {
+      context.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
     // Get the image data as base64
-    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+    const imageData = canvas.toDataURL('image/jpeg', 0.92);
 
     // Stop the camera
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
+    stopCamera();
 
     // Pass the captured image to parent
     onCapture(imageData);
@@ -116,6 +164,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
   };
 
   const handleInstantCapture = () => {
+    if (!isReady) return;
     captureImage();
   };
 
@@ -124,11 +173,9 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
   };
 
   const handleClose = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-    setStream(null);
+    stopCamera();
     setError('');
+    setCountdown(null);
     onClose();
   };
 
@@ -222,7 +269,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
             {/* Switch Camera */}
             <button
               onClick={switchCamera}
-              disabled={isLoading || !!error}
+              disabled={!isReady || !!error || countdown !== null}
               className={`p-3 rounded-full ${isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               title="Switch Camera"
             >
@@ -234,7 +281,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
             {/* Capture Button */}
             <button
               onClick={handleCapture}
-              disabled={isLoading || !!error || countdown !== null}
+              disabled={!isReady || !!error || countdown !== null}
               className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               title="Take Photo (3s countdown)"
             >
@@ -244,7 +291,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isDark = true }) => {
             {/* Instant Capture */}
             <button
               onClick={handleInstantCapture}
-              disabled={isLoading || !!error || countdown !== null}
+              disabled={!isReady || !!error || countdown !== null}
               className={`p-3 rounded-full ${isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               title="Instant Capture"
             >
