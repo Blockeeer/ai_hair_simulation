@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import ImageCompareSlider from '../components/ImageCompareSlider';
 import api from '../utils/api';
 
@@ -281,9 +280,6 @@ const Dashboard = () => {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-black' : 'bg-gray-100'}`}>
-      {/* Email Verification Banner */}
-      <EmailVerificationBanner />
-
       {/* Image Modal */}
       {selectedImage && (
         <div

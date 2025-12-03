@@ -15,14 +15,24 @@ const Landing = () => {
   // Theme state
   const [isDark, setIsDark] = useState(true);
 
-  // Calculate generation limits for logged-in users
+  // Calculate generation limits for logged-in users based on subscription tier
   const getGenerationInfo = () => {
     if (!user) return null;
-    const isVerified = user.emailVerified || false;
+    const subscription = user.subscription || { tier: 'free', dailyLimit: 5 };
     const count = user.generationCount || 0;
-    const limit = isVerified ? 5 : 0;
-    const remaining = Math.max(0, limit - count);
-    return { isVerified, count, limit, remaining };
+    const limit = subscription.dailyLimit || 5;
+    const isUnlimited = limit === -1;
+    const remaining = isUnlimited ? -1 : Math.max(0, limit - count);
+    const credits = user.credits || 0;
+    return {
+      count,
+      limit,
+      remaining,
+      isUnlimited,
+      tier: subscription.tier || 'free',
+      tierName: subscription.tierName || 'Free',
+      credits
+    };
   };
 
   const generationInfo = getGenerationInfo();
@@ -187,24 +197,35 @@ const Landing = () => {
               {/* Generation Count Indicator - Only show for logged-in users */}
               {isAuthenticated && generationInfo && (
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                  {generationInfo.isVerified ? (
+                  {/* Tier Badge */}
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                    generationInfo.tier === 'unlimited'
+                      ? 'bg-purple-500/20 text-purple-400'
+                      : generationInfo.tier === 'premium'
+                      ? 'bg-yellow-500/20 text-yellow-400'
+                      : isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {generationInfo.tierName}
+                  </span>
+                  {/* Remaining count */}
+                  {generationInfo.isUnlimited ? (
+                    <span className={`text-sm ${textSecondary}`}>
+                      <svg className="w-4 h-4 inline text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                      </svg>
+                      <span className="hidden sm:inline ml-1">Unlimited</span>
+                    </span>
+                  ) : (
                     <>
                       <div className={`w-2 h-2 rounded-full ${
-                        generationInfo.remaining > 2 ? 'bg-green-500' :
+                        generationInfo.remaining > 2 || generationInfo.credits > 0 ? 'bg-green-500' :
                         generationInfo.remaining > 0 ? 'bg-yellow-500' : 'bg-red-500'
                       }`}></div>
                       <span className={`text-sm ${textSecondary}`}>
-                        <span className={`font-semibold ${textPrimary}`}>{generationInfo.remaining}</span>
-                        <span className="hidden sm:inline"> generations left</span>
+                        <span className={`font-semibold ${textPrimary}`}>{generationInfo.remaining + generationInfo.credits}</span>
+                        <span className="hidden sm:inline"> / {generationInfo.limit}{generationInfo.credits > 0 ? ` +${generationInfo.credits}` : ''}</span>
                         <span className="sm:hidden"> left</span>
                       </span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <span className="text-sm text-yellow-500">Verify email</span>
                     </>
                   )}
                 </div>

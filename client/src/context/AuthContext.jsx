@@ -120,16 +120,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const resendVerification = async () => {
-    try {
-      const response = await api.post('/auth/resend-verification');
-      return response.data;
-    } catch (error) {
-      console.error('Resend verification error:', error);
-      throw error;
-    }
-  };
-
   const refreshUser = async () => {
     try {
       const response = await api.get('/auth/me');
@@ -174,7 +164,6 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     changePassword,
     googleAuth,
-    resendVerification,
     refreshUser,
     updateProfilePicture,
     removeProfilePicture

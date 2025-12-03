@@ -6,12 +6,14 @@ const authRoutes = require('./authRoutes');
 const hairRoutes = require('./hairRoutes');
 const simulationRoutes = require('./simulationRoutes');
 const historyRoutes = require('./historyRoutes');
+const subscriptionRoutes = require('./subscriptionRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/hair', hairRoutes);
 router.use('/simulation', simulationRoutes);
 router.use('/history', historyRoutes);
+router.use('/subscription', subscriptionRoutes);
 
 // Health check route
 router.get('/health', (req, res) => {

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import EmailVerificationBanner from '../components/EmailVerificationBanner';
 import ImageCompareSlider from '../components/ImageCompareSlider';
 import api from '../utils/api';
 import ImageCropModal from '../components/ImageCropModal';
@@ -21,6 +20,9 @@ const Simulation = () => {
   const [showCropModal, setShowCropModal] = useState(false);
   const [rawImage, setRawImage] = useState(null);
   const [viewMode, setViewMode] = useState('slider'); // 'slider' or 'sideBySide'
+
+  // Pricing modal
+  const [showPricingModal, setShowPricingModal] = useState(false);
 
   // Queue status
   const [queueStatus, setQueueStatus] = useState(null);
@@ -206,16 +208,21 @@ const Simulation = () => {
   ];
 
 
-  // Update generation limit based on user verification status
+  // Update generation limit based on subscription tier
   useEffect(() => {
     if (user) {
-      const isVerified = user.emailVerified || false;
+      const subscription = user.subscription || { tier: 'free', dailyLimit: 5 };
       const count = user.generationCount || 0;
-      const limit = isVerified ? 5 : 0;
+      const limit = subscription.dailyLimit || 5;
+      const isUnlimited = limit === -1;
       setGenerationLimit({
         generationCount: count,
         limit: limit,
-        remaining: Math.max(0, limit - count)
+        remaining: isUnlimited ? -1 : Math.max(0, limit - count),
+        isUnlimited,
+        tier: subscription.tier || 'free',
+        tierName: subscription.tierName || 'Free',
+        credits: user.credits || 0
       });
     }
   }, [user]);
@@ -344,17 +351,20 @@ const Simulation = () => {
       return;
     }
 
-    // Check if user is verified
-    if (!user?.emailVerified) {
-      setError('Please verify your email to unlock 5 free generations.');
+    // Check generation limit (skip for unlimited tier)
+    const canGenerate = generationLimit.isUnlimited ||
+                        generationLimit.remaining > 0 ||
+                        generationLimit.credits > 0;
+
+    if (!canGenerate) {
+      setError(`You have used all ${generationLimit.limit} generations for today. Upgrade to Premium for more! Resets in 24 hours.`);
       return;
     }
 
-    // Check generation limit
-    if (generationLimit.remaining <= 0) {
-      setError('You have used all your free generations.');
-      return;
-    }
+    // Determine if we need to use credits
+    const needsCredit = !generationLimit.isUnlimited &&
+                        generationLimit.remaining <= 0 &&
+                        generationLimit.credits > 0;
 
     setIsGenerating(true);
     setError('');
@@ -366,28 +376,62 @@ const Simulation = () => {
         haircut: haircut,
         hair_color: hairColor,
         gender: gender,
-        model: aiModel
+        model: aiModel,
+        useCredit: needsCredit
       });
 
       if (response.data.success) {
         setResultImage(response.data.data.resultImage);
-        // Update generation limit after successful generation
-        setGenerationLimit(prev => ({
-          ...prev,
-          generationCount: prev.generationCount + 1,
-          remaining: prev.remaining - 1
-        }));
+
+        // Update generation limit based on response
+        if (response.data.data.generationInfo) {
+          const info = response.data.data.generationInfo;
+          setGenerationLimit({
+            generationCount: info.count,
+            limit: info.limit,
+            remaining: info.remaining,
+            isUnlimited: info.isUnlimited,
+            tier: info.tier,
+            tierName: info.tierName,
+            credits: info.credits
+          });
+        } else if (!generationLimit.isUnlimited) {
+          // Fallback local update
+          if (response.data.data.usedCredit) {
+            setGenerationLimit(prev => ({
+              ...prev,
+              credits: prev.credits - 1
+            }));
+          } else {
+            setGenerationLimit(prev => ({
+              ...prev,
+              generationCount: prev.generationCount + 1,
+              remaining: prev.remaining - 1
+            }));
+          }
+        }
+
+        if (response.data.data.usedCredit) {
+          setSuccess('Generated using 1 credit!');
+          setTimeout(() => setSuccess(''), 3000);
+        }
       }
     } catch (err) {
       const errorData = err.response?.data;
-      if (errorData?.requiresVerification) {
-        setError('Please verify your email to unlock 5 free generations.');
-      } else if (errorData?.limitReached) {
-        setError(`You have used all ${errorData.limit} free generations.`);
+      if (errorData?.limitReached) {
+        if (errorData?.canUseCredits) {
+          setError(`Daily limit reached. You have ${errorData.credits} credits available.`);
+        } else {
+          setError(`You have used all ${errorData.limit} generations for today. Upgrade to ${errorData.tierName === 'Free' ? 'Premium' : 'Unlimited'} for more!`);
+        }
         setGenerationLimit({
-          generationCount: errorData.generationCount,
-          limit: errorData.limit,
-          remaining: 0
+          generationCount: errorData.generationCount || generationLimit.generationCount,
+          limit: errorData.limit || generationLimit.limit,
+          remaining: 0,
+          isUnlimited: false,
+          tier: errorData.tier || generationLimit.tier,
+          tierName: errorData.tierName || generationLimit.tierName,
+          credits: errorData.credits || 0
         });
       } else {
         setError(errorData?.message || 'Failed to generate simulation. Please try again.');
@@ -471,11 +515,44 @@ const Simulation = () => {
     }
   };
 
+  const handleUpgrade = async (tier) => {
+    // For now, just show a coming soon message - all users stay on free plan
+    setShowPricingModal(false);
+    setSuccess(`${tier.charAt(0).toUpperCase() + tier.slice(1)} plan coming soon! Stay tuned.`);
+    setTimeout(() => setSuccess(''), 4000);
+  };
+
+  // Subscription tiers data
+  const subscriptionTiers = [
+    {
+      id: 'free',
+      name: 'Free',
+      price: 0,
+      period: '',
+      features: ['5 generations per day', 'Basic AI models', 'Standard quality'],
+      current: generationLimit.tier === 'free'
+    },
+    {
+      id: 'premium',
+      name: 'Premium',
+      price: 9.99,
+      period: '/month',
+      features: ['50 generations per day', 'All AI models', 'HD quality', 'Priority processing', 'Save unlimited history'],
+      current: generationLimit.tier === 'premium',
+      popular: true
+    },
+    {
+      id: 'unlimited',
+      name: 'Unlimited',
+      price: 19.99,
+      period: '/month',
+      features: ['Unlimited generations', 'All AI models', 'HD quality', 'Priority processing', 'Save unlimited history', 'Early access to new features'],
+      current: generationLimit.tier === 'unlimited'
+    }
+  ];
+
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-black' : 'bg-gray-100'}`}>
-      {/* Email Verification Banner */}
-      <EmailVerificationBanner />
-
       {/* Image Crop Modal */}
       {showCropModal && rawImage && (
         <ImageCropModal
@@ -484,6 +561,124 @@ const Simulation = () => {
           onCancel={handleCropCancel}
           cropSize={512}
         />
+      )}
+
+      {/* Pricing Modal */}
+      {showPricingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className={`relative w-full max-w-4xl my-8 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl shadow-2xl overflow-hidden`}>
+            {/* Close button */}
+            <button
+              onClick={() => setShowPricingModal(false)}
+              className={`absolute top-4 right-4 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'} transition-colors z-10`}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="p-6 md:p-8">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <h2 className={`text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
+                  Upgrade Your Plan
+                </h2>
+                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Get more generations and unlock premium features
+                </p>
+              </div>
+
+              {/* Pricing Cards */}
+              <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+                {subscriptionTiers.map((tier) => (
+                  <div
+                    key={tier.id}
+                    className={`relative rounded-xl p-6 border-2 transition-all ${
+                      tier.popular
+                        ? isDark ? 'border-yellow-500 bg-gray-800' : 'border-yellow-500 bg-yellow-50'
+                        : tier.current
+                        ? isDark ? 'border-green-500 bg-gray-800' : 'border-green-500 bg-green-50'
+                        : isDark ? 'border-gray-700 bg-gray-800 hover:border-gray-600' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    }`}
+                  >
+                    {/* Popular badge */}
+                    {tier.popular && (
+                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full">
+                          MOST POPULAR
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Current plan badge */}
+                    {tier.current && (
+                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                          CURRENT PLAN
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Tier name */}
+                    <h3 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-2 ${tier.popular || tier.current ? 'mt-2' : ''}`}>
+                      {tier.name}
+                    </h3>
+
+                    {/* Price */}
+                    <div className="mb-4">
+                      <span className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        ${tier.price}
+                      </span>
+                      <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {tier.period}
+                      </span>
+                    </div>
+
+                    {/* Features */}
+                    <ul className="space-y-2 mb-6">
+                      {tier.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <svg className={`w-5 h-5 flex-shrink-0 ${tier.popular ? 'text-yellow-500' : 'text-green-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Button */}
+                    <button
+                      onClick={() => !tier.current && tier.id !== 'free' && handleUpgrade(tier.id)}
+                      disabled={tier.current || tier.id === 'free'}
+                      className={`w-full py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                        tier.current
+                          ? isDark ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : tier.id === 'free'
+                          ? isDark ? 'bg-gray-700 text-gray-400 cursor-not-allowed' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : tier.popular
+                          ? 'bg-yellow-500 text-black hover:bg-yellow-400'
+                          : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {tier.current ? (
+                        'Current Plan'
+                      ) : tier.id === 'free' ? (
+                        'Free Plan'
+                      ) : (
+                        `Upgrade to ${tier.name}`
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Note */}
+              <p className={`text-center text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-6`}>
+                * This is a demo. No real payment will be processed.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Error Toast - Fixed position, doesn't affect layout */}
@@ -1030,51 +1225,83 @@ const Simulation = () => {
 
             {/* Generation Limit Status */}
             <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3 mb-3`}>
-              {!user?.emailVerified ? (
-                // Unverified user - show verification prompt
-                <div className="flex items-start gap-2">
-                  <div className="mt-0.5">
-                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              {/* Tier Badge */}
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  generationLimit.tier === 'unlimited'
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : generationLimit.tier === 'premium'
+                    ? 'bg-yellow-500/20 text-yellow-400'
+                    : isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {generationLimit.tierName || 'Free'} Plan
+                </span>
+                {generationLimit.credits > 0 && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                    +{generationLimit.credits} credits
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  generationLimit.isUnlimited
+                    ? isDark ? 'bg-purple-900/50' : 'bg-purple-100'
+                    : generationLimit.remaining > 0 || generationLimit.credits > 0
+                    ? isDark ? 'bg-green-900/50' : 'bg-green-100'
+                    : isDark ? 'bg-red-900/50' : 'bg-red-100'
+                }`}>
+                  {generationLimit.isUnlimited ? (
+                    <svg className={`w-4 h-4 ${isDark ? 'text-purple-400' : 'text-purple-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
                     </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-xs font-medium ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                      Email not verified
-                    </p>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
-                      Verify your email to unlock 5 free generations
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                // Verified user - show generation count
-                <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    generationLimit.remaining > 0
-                      ? isDark ? 'bg-green-900/50' : 'bg-green-100'
-                      : isDark ? 'bg-red-900/50' : 'bg-red-100'
-                  }`}>
+                  ) : (
                     <span className={`text-sm font-bold ${
-                      generationLimit.remaining > 0
+                      generationLimit.remaining > 0 || generationLimit.credits > 0
                         ? isDark ? 'text-green-400' : 'text-green-600'
                         : isDark ? 'text-red-400' : 'text-red-600'
                     }`}>
-                      {generationLimit.remaining}
+                      {generationLimit.remaining + (generationLimit.credits || 0)}
                     </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                      {generationLimit.remaining > 0
-                        ? `${generationLimit.remaining} generation${generationLimit.remaining !== 1 ? 's' : ''} remaining`
-                        : 'No generations remaining'
-                      }
-                    </p>
-                    <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {generationLimit.generationCount} of {generationLimit.limit} used
-                    </p>
-                  </div>
+                  )}
                 </div>
+                <div className="flex-1">
+                  <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {generationLimit.isUnlimited
+                      ? 'Unlimited generations'
+                      : generationLimit.remaining > 0
+                      ? `${generationLimit.remaining} generation${generationLimit.remaining !== 1 ? 's' : ''} remaining today`
+                      : generationLimit.credits > 0
+                      ? `${generationLimit.credits} credit${generationLimit.credits !== 1 ? 's' : ''} available`
+                      : 'No generations remaining'
+                    }
+                  </p>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {generationLimit.isUnlimited
+                      ? 'Generate as many as you want!'
+                      : generationLimit.remaining > 0
+                      ? `${generationLimit.generationCount} of ${generationLimit.limit} used today`
+                      : generationLimit.credits > 0
+                      ? 'Use credits for extra generations'
+                      : 'Resets in 24 hours'
+                    }
+                  </p>
+                </div>
+              </div>
+              {/* Upgrade Button - Show for free and premium tiers */}
+              {generationLimit.tier !== 'unlimited' && (
+                <button
+                  onClick={() => setShowPricingModal(true)}
+                  className={`mt-2 w-full py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                    isDark
+                      ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black'
+                      : 'bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  Upgrade Plan
+                </button>
               )}
             </div>
 
@@ -1102,14 +1329,14 @@ const Simulation = () => {
             <div className="flex lg:flex-col gap-3">
               <button
                 onClick={handleGenerate}
-                disabled={!uploadedImage || isGenerating || !user?.emailVerified || generationLimit.remaining <= 0}
+                disabled={!uploadedImage || isGenerating || (!generationLimit.isUnlimited && generationLimit.remaining <= 0 && generationLimit.credits <= 0)}
                 className={`flex-1 lg:w-full py-2.5 md:py-3 rounded-lg font-medium text-xs md:text-sm transition-colors ${
-                  !uploadedImage || isGenerating || !user?.emailVerified || generationLimit.remaining <= 0
+                  !uploadedImage || isGenerating || (!generationLimit.isUnlimited && generationLimit.remaining <= 0 && generationLimit.credits <= 0)
                     ? isDark ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
                 }`}
               >
-                {isGenerating ? 'Generating...' : 'Generate'}
+                {isGenerating ? 'Generating...' : !generationLimit.isUnlimited && generationLimit.remaining <= 0 && generationLimit.credits > 0 ? `Generate (Use Credit)` : 'Generate'}
               </button>
               <button
                 onClick={handleReset}

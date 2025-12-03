@@ -4,16 +4,12 @@ const queueService = require('../services/queueService');
 const crypto = require('crypto');
 const userService = require('../services/userService');
 
-// Generation limits
-const VERIFIED_USER_LIMIT = 5;   // Verified users get 5 free generations
-const UNVERIFIED_USER_LIMIT = 0; // Unverified users get 0 generations
-
 // Generate hair simulation
 const generateSimulation = async (req, res) => {
   const jobId = crypto.randomUUID();
 
   try {
-    const { imageBase64, haircut, hair_color, gender, model } = req.body;
+    const { imageBase64, haircut, hair_color, gender, model, useCredit } = req.body;
     const userId = req.user?.id;
 
     if (!imageBase64) {
@@ -23,34 +19,54 @@ const generateSimulation = async (req, res) => {
       });
     }
 
+    let usedCredit = false;
+
     // Check generation limit for logged-in users
     if (userId) {
-      const user = await userService.getUserById(userId);
-      const isVerified = user?.emailVerified || false;
-      const generationCount = user?.generationCount || 0;
-      const userLimit = isVerified ? VERIFIED_USER_LIMIT : UNVERIFIED_USER_LIMIT;
+      const generationInfo = await userService.getGenerationInfo(userId);
 
-      // Unverified users cannot generate at all
-      if (!isVerified) {
-        return res.status(403).json({
-          success: false,
-          message: 'Please verify your email to unlock 5 free generations.',
-          requiresVerification: true,
-          emailVerified: false,
-          generationCount: 0,
-          limit: VERIFIED_USER_LIMIT
-        });
-      }
-
-      // Check if verified user has reached their limit
-      if (generationCount >= userLimit) {
-        return res.status(403).json({
-          success: false,
-          message: `You have reached your limit of ${userLimit} free generations.`,
-          limitReached: true,
-          generationCount,
-          limit: userLimit
-        });
+      // Check if user has reached their daily limit (unless unlimited)
+      if (!generationInfo.isUnlimited && generationInfo.remaining <= 0) {
+        // Check if user wants to use credits
+        if (useCredit && generationInfo.credits > 0) {
+          const creditUsed = await userService.useCredit(userId);
+          if (creditUsed) {
+            usedCredit = true;
+          } else {
+            return res.status(403).json({
+              success: false,
+              message: 'Failed to use credit',
+              limitReached: true
+            });
+          }
+        } else if (generationInfo.credits > 0) {
+          // User has credits but didn't opt to use them
+          return res.status(403).json({
+            success: false,
+            message: `You have used all ${generationInfo.limit} generations for today. You have ${generationInfo.credits} credits available. Resets in ${generationInfo.resetInHours} hours.`,
+            limitReached: true,
+            generationCount: generationInfo.count,
+            limit: generationInfo.limit,
+            resetInHours: generationInfo.resetInHours,
+            credits: generationInfo.credits,
+            canUseCredits: true,
+            tier: generationInfo.tier,
+            tierName: generationInfo.tierName
+          });
+        } else {
+          return res.status(403).json({
+            success: false,
+            message: `You have used all ${generationInfo.limit} generations for today. Upgrade to Premium for more! Resets in ${generationInfo.resetInHours} hours.`,
+            limitReached: true,
+            generationCount: generationInfo.count,
+            limit: generationInfo.limit,
+            resetInHours: generationInfo.resetInHours,
+            credits: 0,
+            canUseCredits: false,
+            tier: generationInfo.tier,
+            tierName: generationInfo.tierName
+          });
+        }
       }
     }
 
@@ -86,10 +102,13 @@ const generateSimulation = async (req, res) => {
     // Remove job from queue (success)
     queueService.removeJob(jobId, true);
 
-    // Increment generation count for logged-in users
-    if (userId) {
+    // Increment generation count for logged-in users (unless they used a credit)
+    if (userId && !usedCredit) {
       await userService.incrementGenerationCount(userId);
     }
+
+    // Get updated generation info
+    const updatedGenerationInfo = userId ? await userService.getGenerationInfo(userId) : null;
 
     res.status(200).json({
       success: true,
@@ -98,7 +117,9 @@ const generateSimulation = async (req, res) => {
         originalImage: imageBase64,
         resultImage: result,
         model: selectedModel,
-        options: { haircut, hair_color, gender }
+        options: { haircut, hair_color, gender },
+        usedCredit,
+        generationInfo: updatedGenerationInfo
       }
     });
   } catch (error) {
@@ -243,21 +264,32 @@ const getGenerationLimit = async (req, res) => {
         success: true,
         data: {
           generationCount: 0,
-          limit: USER_LIMIT,
-          remaining: USER_LIMIT
+          limit: 5,
+          remaining: 5,
+          resetInHours: 24,
+          tier: 'free',
+          tierName: 'Free',
+          isUnlimited: false,
+          credits: 0,
+          totalAvailable: 5
         }
       });
     }
 
-    const user = await userService.getUserById(userId);
-    const generationCount = user?.generationCount || 0;
+    const generationInfo = await userService.getGenerationInfo(userId);
 
     res.status(200).json({
       success: true,
       data: {
-        generationCount,
-        limit: USER_LIMIT,
-        remaining: Math.max(0, USER_LIMIT - generationCount)
+        generationCount: generationInfo.count,
+        limit: generationInfo.limit,
+        remaining: generationInfo.remaining,
+        resetInHours: generationInfo.resetInHours,
+        tier: generationInfo.tier,
+        tierName: generationInfo.tierName,
+        isUnlimited: generationInfo.isUnlimited,
+        credits: generationInfo.credits,
+        totalAvailable: generationInfo.totalAvailable
       }
     });
   } catch (error) {

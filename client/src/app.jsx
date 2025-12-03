@@ -7,7 +7,6 @@ import PublicRoute from './components/PublicRoute';
 import Landing from './pages/Landing';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Simulation from './pages/Simulation.jsx';
 import Profile from './pages/Profile';
@@ -32,7 +31,6 @@ function App() {
           {/* Public routes - redirect to dashboard if already logged in */}
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
-          <Route path="/verify-email/:token" element={<VerifyEmail />} />
           <Route
             path="/dashboard"
             element={
