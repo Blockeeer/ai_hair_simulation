@@ -81,29 +81,24 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // Check if credits were already added (prevent double-crediting)
-    const user = await userService.findById(userId);
-    if (user.lastPaymentSessionId === sessionId) {
+    // Add credits atomically with session check to prevent double-crediting
+    const creditsToAdd = parseInt(session.metadata.credits);
+    const result = await userService.addCreditsWithSessionCheck(userId, creditsToAdd, sessionId);
+
+    if (result.alreadyProcessed) {
       return res.json({
         success: true,
         message: 'Credits already added',
         alreadyProcessed: true,
-        credits: user.credits
+        credits: result.credits
       });
     }
-
-    // Add credits to user
-    const creditsToAdd = parseInt(session.metadata.credits);
-    const newBalance = await userService.addCredits(userId, creditsToAdd);
-
-    // Save session ID to prevent double-crediting
-    await userService.updateUser(userId, { lastPaymentSessionId: sessionId });
 
     res.json({
       success: true,
       message: `Successfully added ${creditsToAdd} credits!`,
       creditsAdded: creditsToAdd,
-      newBalance: newBalance
+      newBalance: result.credits
     });
   } catch (error) {
     console.error('Verify payment error:', error);
@@ -136,14 +131,12 @@ exports.handleWebhook = async (req, res) => {
           const creditsToAdd = parseInt(session.metadata.credits);
           const sessionId = session.id;
 
-          // Check if already processed
-          const user = await userService.findById(userId);
-          if (user && user.lastPaymentSessionId !== sessionId) {
-            // Add credits
-            await userService.addCredits(userId, creditsToAdd);
-            // Mark as processed
-            await userService.updateUser(userId, { lastPaymentSessionId: sessionId });
+          // Add credits atomically with session check to prevent double-crediting
+          const result = await userService.addCreditsWithSessionCheck(userId, creditsToAdd, sessionId);
+          if (!result.alreadyProcessed) {
             console.log(`Webhook: Added ${creditsToAdd} credits to user ${userId}`);
+          } else {
+            console.log(`Webhook: Session ${sessionId} already processed for user ${userId}`);
           }
         }
         break;

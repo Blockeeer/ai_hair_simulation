@@ -1,4 +1,4 @@
-const { getFirestore, getAuth } = require('../config/firebase');
+const { getFirestore, getAuth, FieldValue } = require('../config/firebase');
 const bcrypt = require('bcryptjs');
 
 // Free tier configuration (all users get 3 free generations total, then must buy credits)
@@ -308,6 +308,42 @@ class UserService {
     });
 
     return newCredits;
+  }
+
+  // Atomic credit addition with session ID check to prevent double-crediting
+  async addCreditsWithSessionCheck(userId, amount, sessionId) {
+    const userRef = this.usersCollection.doc(userId);
+
+    try {
+      const result = await this.db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+
+        if (!userDoc.exists) {
+          throw new Error('User not found');
+        }
+
+        const userData = userDoc.data();
+
+        // Check if this session was already processed
+        if (userData.lastPaymentSessionId === sessionId) {
+          return { alreadyProcessed: true, credits: userData.credits || 0 };
+        }
+
+        // Add credits atomically
+        const newCredits = (userData.credits || 0) + amount;
+        transaction.update(userRef, {
+          credits: newCredits,
+          lastPaymentSessionId: sessionId
+        });
+
+        return { alreadyProcessed: false, credits: newCredits };
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Transaction error:', error);
+      throw error;
+    }
   }
 
   async useCredit(userId) {

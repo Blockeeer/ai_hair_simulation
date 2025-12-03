@@ -67,5 +67,6 @@ module.exports = {
   getFirestore,
   getAuth,
   getStorage,
-  admin
+  admin,
+  FieldValue: admin.firestore.FieldValue
 };
