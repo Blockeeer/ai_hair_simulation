@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useSimulation } from '../context/SimulationContext';
 import ImageCompareSlider from '../components/ImageCompareSlider';
 import api from '../utils/api';
 import ImageCropModal from '../components/ImageCropModal';
@@ -12,8 +13,11 @@ const Simulation = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { isDark } = useTheme();
-  const [uploadedImage, setUploadedImage] = useState(null);
-  const [resultImage, setResultImage] = useState(null);
+  const { simulationState, updateSimulation, clearSimulation } = useSimulation();
+
+  // Initialize state from context (persisted state)
+  const [uploadedImage, setUploadedImage] = useState(simulationState.uploadedImage);
+  const [resultImage, setResultImage] = useState(simulationState.resultImage);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +27,7 @@ const Simulation = () => {
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [rawImage, setRawImage] = useState(null);
   const [viewMode, setViewMode] = useState('slider'); // 'slider' or 'sideBySide'
-  const [isSaved, setIsSaved] = useState(false); // Track if current result is saved
+  const [isSaved, setIsSaved] = useState(simulationState.isSaved); // Track if current result is saved
 
   // Pricing modal
   const [showPricingModal, setShowPricingModal] = useState(false);
@@ -39,17 +43,32 @@ const Simulation = () => {
   // Credit packages
   const [creditPackages, setCreditPackages] = useState([]);
 
-  // AI Model selection
-  const [aiModel, setAiModel] = useState('replicate');
+  // AI Model selection - initialized from context
+  const [aiModel, setAiModel] = useState(simulationState.aiModel);
 
-  // Replicate options
-  const [haircut, setHaircut] = useState('Random');
-  const [hairColor, setHairColor] = useState('Random');
-  const [gender, setGender] = useState('male');
+  // Replicate options - initialized from context
+  const [haircut, setHaircut] = useState(simulationState.haircut);
+  const [hairColor, setHairColor] = useState(simulationState.hairColor);
+  const [gender, setGender] = useState(simulationState.gender);
 
-  // Custom input toggles for Gemini model
-  const [useCustomHaircut, setUseCustomHaircut] = useState(false);
-  const [useCustomHairColor, setUseCustomHairColor] = useState(false);
+  // Custom input toggles for Gemini model - initialized from context
+  const [useCustomHaircut, setUseCustomHaircut] = useState(simulationState.useCustomHaircut);
+  const [useCustomHairColor, setUseCustomHairColor] = useState(simulationState.useCustomHairColor);
+
+  // Persist state changes to context
+  useEffect(() => {
+    updateSimulation({
+      uploadedImage,
+      resultImage,
+      haircut,
+      hairColor,
+      gender,
+      aiModel,
+      useCustomHaircut,
+      useCustomHairColor,
+      isSaved,
+    });
+  }, [uploadedImage, resultImage, haircut, hairColor, gender, aiModel, useCustomHaircut, useCustomHairColor, isSaved]);
 
   // AI Model options
   const aiModelOptions = [

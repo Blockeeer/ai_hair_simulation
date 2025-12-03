@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { SimulationProvider } from './context/SimulationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import Landing from './pages/Landing';
@@ -39,6 +40,7 @@ function App() {
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <Router>
           <AuthProvider>
+          <SimulationProvider>
           <Routes>
           {/* Landing page - redirects to dashboard if logged in */}
           <Route path="/" element={<LandingWrapper />} />
@@ -81,6 +83,7 @@ function App() {
             {/* Redirect unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
+          </SimulationProvider>
           </AuthProvider>
         </Router>
       </GoogleOAuthProvider>
