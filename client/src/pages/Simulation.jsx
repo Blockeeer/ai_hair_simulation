@@ -1,19 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSimulation } from '../context/SimulationContext';
 import ImageCompareSlider from '../components/ImageCompareSlider';
+import Navbar from '../components/Navbar';
 import api from '../utils/api';
 import ImageCropModal from '../components/ImageCropModal';
 import CameraModal from '../components/CameraModal';
 import creditsIcon from '../assets/credits.png';
 
 const Simulation = () => {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { isDark } = useTheme();
-  const { simulationState, updateSimulation, clearSimulation } = useSimulation();
+  const { simulationState, updateSimulation } = useSimulation();
 
   // Initialize state from context (persisted state)
   const [uploadedImage, setUploadedImage] = useState(simulationState.uploadedImage);
@@ -22,7 +21,6 @@ const Simulation = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
   const [rawImage, setRawImage] = useState(null);
@@ -313,11 +311,6 @@ const Simulation = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
   };
 
   const handleDragOver = (e) => {
@@ -809,116 +802,8 @@ const Simulation = () => {
         </div>
       )}
 
-      {/* Responsive Navbar */}
-      <header className={`${isDark ? 'bg-gray-950/80 backdrop-blur-xl border-gray-800' : 'bg-white/80 backdrop-blur-xl border-gray-200'} border-b sticky top-0 z-50 transition-colors duration-300`}>
-        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          {/* Logo */}
-          <h1
-            onClick={() => navigate('/landing')}
-            className="text-lg md:text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            AI Hair Simulation
-          </h1>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-4">
-            <button
-              onClick={() => navigate('/simulation')}
-              className={`text-purple-500 font-medium transition-colors text-sm`}
-            >
-              Simulation
-            </button>
-            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
-            >
-              Dashboard
-            </button>
-            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
-            <button
-              onClick={() => navigate('/profile')}
-              className={`flex items-center gap-2 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
-            >
-              {user?.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt=""
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-              ) : (
-                <div className={`w-6 h-6 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
-                  <svg className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-              )}
-              {user?.username}
-            </button>
-            <button
-              onClick={handleLogout}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-lg transition-all text-sm hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25"
-            >
-              Logout
-            </button>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`md:hidden ${isDark ? 'text-white' : 'text-gray-900'} p-2`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
-
-        {/* Mobile Menu Dropdown */}
-        {mobileMenuOpen && (
-          <div className={`md:hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-gray-50 border-gray-200'} border-t px-4 py-3 space-y-3`}>
-            <button
-              onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
-              className={`flex items-center gap-2 w-full text-left ${isDark ? 'text-white' : 'text-gray-900'} py-2 text-sm`}
-            >
-              {user?.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt=""
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              )}
-              {user?.username}
-            </button>
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block w-full text-left text-purple-500 font-medium py-2 text-sm`}
-            >
-              Simulation
-            </button>
-            <button
-              onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
-              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={handleLogout}
-              className="block w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-lg text-sm text-center"
-            >
-              Logout
-            </button>
-          </div>
-        )}
-      </header>
+      {/* Shared Navbar */}
+      <Navbar />
 
       {/* Main Content - Mobile: Column, Desktop: Row */}
       <main className="flex flex-col lg:flex-row min-h-[calc(100vh-57px)]">

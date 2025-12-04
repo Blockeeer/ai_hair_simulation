@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import ImageCompareSlider from '../components/ImageCompareSlider';
+import Navbar from '../components/Navbar';
 import api from '../utils/api';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { isDark } = useTheme();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({ totalSimulations: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -225,11 +225,6 @@ const Dashboard = () => {
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedItems(new Set());
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
   };
 
   const formatDate = (date) => {
@@ -482,115 +477,8 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Responsive Navbar */}
-      <header className={`${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'} backdrop-blur-xl border-b sticky top-0 z-40 transition-colors duration-300`}>
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
-          <h1
-            onClick={() => navigate('/landing')}
-            className={`text-lg md:text-xl font-bold bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity`}
-          >
-            AI Hair Simulation
-          </h1>
-
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-4">
-            <button
-              onClick={() => navigate('/simulation')}
-              className={`${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
-            >
-              Simulation
-            </button>
-            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className={`text-purple-500 font-medium transition-colors text-sm`}
-            >
-              Dashboard
-            </button>
-            <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
-            <button
-              onClick={() => navigate('/profile')}
-              className={`flex items-center gap-2 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors text-sm`}
-            >
-              {user?.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt=""
-                  className="w-6 h-6 rounded-full object-cover ring-2 ring-purple-500/50"
-                />
-              ) : (
-                <div className={`w-6 h-6 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'} flex items-center justify-center`}>
-                  <svg className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-              )}
-              {user?.username}
-            </button>
-            <button
-              onClick={handleLogout}
-              className={`${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg transition-colors text-sm`}
-            >
-              Logout
-            </button>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className={`md:hidden ${isDark ? 'text-white' : 'text-gray-900'} p-2`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className={`md:hidden ${isDark ? 'bg-gray-900/95 border-gray-800' : 'bg-white/95 border-gray-200'} backdrop-blur-xl border-t px-4 py-3 space-y-3`}>
-            <button
-              onClick={() => { navigate('/profile'); setMobileMenuOpen(false); }}
-              className={`flex items-center gap-2 w-full text-left ${isDark ? 'text-white' : 'text-gray-900'} py-2 text-sm`}
-            >
-              {user?.profileImage ? (
-                <img
-                  src={user.profileImage}
-                  alt=""
-                  className="w-6 h-6 rounded-full object-cover"
-                />
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              )}
-              {user?.username}
-            </button>
-            <button
-              onClick={() => { navigate('/simulation'); setMobileMenuOpen(false); }}
-              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
-            >
-              Simulation
-            </button>
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block w-full text-left text-purple-500 font-medium py-2 text-sm`}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={handleLogout}
-              className={`block w-full ${isDark ? 'bg-gray-800 hover:bg-gray-700 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'} px-4 py-2 rounded-lg text-sm text-center`}
-            >
-              Logout
-            </button>
-          </div>
-        )}
-      </header>
+      {/* Shared Navbar */}
+      <Navbar />
 
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-12">
