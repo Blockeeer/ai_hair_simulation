@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import LoginModal from '../components/LoginModal';
 import RegisterModal from '../components/RegisterModal';
 
@@ -11,9 +12,7 @@ import imgAfter from '../assets/img_after.png';
 const Landing = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-
-  // Theme state
-  const [isDark, setIsDark] = useState(true);
+  const { isDark, toggleTheme } = useTheme();
 
   // Before/After slider state
   const [sliderPosition, setSliderPosition] = useState(50);
@@ -355,7 +354,7 @@ const Landing = () => {
             <div className="flex items-center space-x-4">
               {/* Theme Toggle */}
               <button
-                onClick={() => setIsDark(!isDark)}
+                onClick={toggleTheme}
                 className={`p-2.5 rounded-xl ${isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'} transition-all duration-300 hover:scale-110`}
               >
                 {isDark ? (
@@ -374,16 +373,16 @@ const Landing = () => {
                   {/* Desktop Nav */}
                   <div className="hidden md:flex items-center space-x-3">
                     <button
-                      onClick={() => navigate('/simulation')}
-                      className={`${textSecondary} hover:text-purple-400 transition-colors px-3 py-2 text-sm font-medium`}
-                    >
-                      Simulation
-                    </button>
-                    <button
                       onClick={() => navigate('/dashboard')}
                       className={`${textSecondary} hover:text-purple-400 transition-colors px-3 py-2 text-sm font-medium`}
                     >
                       Dashboard
+                    </button>
+                    <button
+                      onClick={() => navigate('/simulation')}
+                      className={`${textSecondary} hover:text-purple-400 transition-colors px-3 py-2 text-sm font-medium`}
+                    >
+                      Simulation
                     </button>
                     <button
                       onClick={() => navigate('/profile')}
@@ -398,9 +397,6 @@ const Landing = () => {
                       )}
                       {user?.username}
                     </button>
-                    <AnimatedButton onClick={() => navigate('/simulation')} className="px-5 py-2.5 rounded-xl text-sm">
-                      Try Now
-                    </AnimatedButton>
                   </div>
 
                   {/* Mobile Menu Button */}
@@ -451,12 +447,6 @@ const Landing = () => {
               {user?.username}
             </button>
             <button
-              onClick={() => { navigate('/simulation'); setMobileMenuOpen(false); }}
-              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
-            >
-              Simulation
-            </button>
-            <button
               onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
               className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
             >
@@ -464,9 +454,9 @@ const Landing = () => {
             </button>
             <button
               onClick={() => { navigate('/simulation'); setMobileMenuOpen(false); }}
-              className="block w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2.5 rounded-xl text-sm text-center font-medium"
+              className={`block w-full text-left ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'} py-2 text-sm`}
             >
-              Try Now
+              Simulation
             </button>
           </div>
         )}
