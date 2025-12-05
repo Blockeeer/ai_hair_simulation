@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import api from '../utils/api';
+import creditsIcon from '../assets/credits.png';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -10,9 +12,58 @@ const Navbar = () => {
   const { isDark, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [creditPackages, setCreditPackages] = useState([]);
+  const [credits, setCredits] = useState({ credits: 0, remaining: 0, limit: 3 });
   const dropdownRef = useRef(null);
 
   const currentPath = location.pathname;
+
+  // Fetch credits on mount and when user changes
+  useEffect(() => {
+    const fetchCredits = async () => {
+      if (!user) return;
+      try {
+        const response = await api.get('/subscription/status');
+        if (response.data.success) {
+          setCredits({
+            credits: response.data.data.credits,
+            remaining: response.data.data.generationsRemaining,
+            limit: response.data.data.freeLimit
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch credits:', err);
+      }
+    };
+    fetchCredits();
+  }, [user]);
+
+  // Fetch credit packages
+  useEffect(() => {
+    const fetchPackages = async () => {
+      try {
+        const response = await api.get('/subscription/packages');
+        if (response.data.success) {
+          setCreditPackages(response.data.data.packages);
+        }
+      } catch (err) {
+        console.error('Failed to fetch credit packages:', err);
+      }
+    };
+    fetchPackages();
+  }, []);
+
+  const handlePurchase = async (packageId) => {
+    try {
+      const response = await api.post('/payment/create-checkout-session', { packageId });
+      if (response.data.success && response.data.url) {
+        window.location.href = response.data.url;
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -32,6 +83,22 @@ const Navbar = () => {
     navigate('/');
   };
 
+  // Prevent body scroll when pricing modal is open and prevent layout shift
+  useEffect(() => {
+    if (showPricingModal) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    };
+  }, [showPricingModal]);
+
   const isActive = (path) => currentPath === path;
 
   const navLinkClass = (path) => {
@@ -49,6 +116,7 @@ const Navbar = () => {
   };
 
   return (
+    <>
     <header className={`${isDark ? 'bg-gray-950/80 backdrop-blur-xl border-gray-800' : 'bg-white/80 backdrop-blur-xl border-gray-200'} border-b sticky top-0 z-50 transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
         {/* Logo */}
@@ -74,6 +142,27 @@ const Navbar = () => {
           >
             Simulation
           </button>
+          <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
+
+          {/* Credits Indicator */}
+          <button
+            onClick={() => setShowPricingModal(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              isDark
+                ? 'bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400'
+                : 'bg-yellow-50 hover:bg-yellow-100 text-yellow-600'
+            }`}
+            title="Buy Credits"
+          >
+            <img src={creditsIcon} alt="credits" className="w-4 h-4" />
+            <span className="text-sm font-medium">{credits.credits}</span>
+            {credits.remaining > 0 && (
+              <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                +{credits.remaining} free
+              </span>
+            )}
+          </button>
+
           <span className={isDark ? 'text-gray-600' : 'text-gray-300'}>|</span>
 
           {/* Profile Dropdown */}
@@ -208,6 +297,32 @@ const Navbar = () => {
             Simulation
           </button>
 
+          {/* Credits - Mobile */}
+          <button
+            onClick={() => { setShowPricingModal(true); setMobileMenuOpen(false); }}
+            className={`flex items-center justify-between w-full py-2.5 px-3 rounded-lg ${
+              isDark
+                ? 'bg-yellow-500/10 text-yellow-400'
+                : 'bg-yellow-50 text-yellow-600'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <img src={creditsIcon} alt="credits" className="w-5 h-5" />
+              <span className="text-sm font-medium">Credits</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold">{credits.credits}</span>
+              {credits.remaining > 0 && (
+                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  +{credits.remaining} free
+                </span>
+              )}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+          </button>
+
           {/* Divider */}
           <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'} my-2`}></div>
 
@@ -255,7 +370,136 @@ const Navbar = () => {
           </button>
         </div>
       )}
+
     </header>
+
+    {/* Credit Packages Modal - Outside header for proper positioning */}
+    {showPricingModal && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+        <div className={`relative w-full max-w-[95vw] sm:max-w-lg md:max-w-4xl my-4 sm:my-8 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto`}>
+          {/* Close button */}
+          <button
+            onClick={() => setShowPricingModal(false)}
+            className={`absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-auto sm:h-auto flex items-center justify-center rounded-full ${isDark ? 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700' : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200'} transition-colors z-10`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <div className="p-4 sm:p-6 md:p-8">
+            {/* Header */}
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-yellow-500/20 mb-3">
+                <img src={creditsIcon} alt="credits" className="w-8 h-8 sm:w-10 sm:h-10" />
+              </div>
+              <h2 className={`text-xl sm:text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-1`}>
+                Buy Credits
+              </h2>
+              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Get more generations with credit packages
+              </p>
+            </div>
+
+            {/* Credit Package Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+              {creditPackages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className={`relative rounded-lg sm:rounded-xl p-2.5 sm:p-4 md:p-5 border-2 transition-all ${
+                    pkg.popular
+                      ? isDark ? 'border-yellow-500 bg-gray-800' : 'border-yellow-500 bg-yellow-50'
+                      : pkg.bestValue
+                      ? isDark ? 'border-green-500 bg-gray-800' : 'border-green-500 bg-green-50'
+                      : isDark ? 'border-gray-700 bg-gray-800 hover:border-gray-600' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                  }`}
+                >
+                  {/* Badge */}
+                  {pkg.popular && (
+                    <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-yellow-500 text-black text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
+                        POPULAR
+                      </span>
+                    </div>
+                  )}
+                  {pkg.bestValue && (
+                    <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-green-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
+                        BEST VALUE
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Package name */}
+                  <h3 className={`text-xs sm:text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-0.5 sm:mb-1 ${pkg.popular || pkg.bestValue ? 'mt-1' : ''}`}>
+                    {pkg.name}
+                  </h3>
+
+                  {/* Credits */}
+                  <div className="mb-1 sm:mb-2 flex items-center gap-1">
+                    <img src={creditsIcon} alt="credits" className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className={`text-xl sm:text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                      {pkg.credits}
+                    </span>
+                  </div>
+
+                  {/* Price */}
+                  <div className="mb-2 sm:mb-3">
+                    <span className={`text-base sm:text-lg font-bold ${pkg.popular ? 'text-yellow-500' : pkg.bestValue ? 'text-green-500' : isDark ? 'text-white' : 'text-gray-900'}`}>
+                      ${pkg.price}
+                    </span>
+                    <p className={`text-[10px] sm:text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      ${pkg.pricePerCredit.toFixed(2)}/credit
+                    </p>
+                  </div>
+
+                  {/* Savings badge - hidden on mobile for space */}
+                  {pkg.savings && (
+                    <div className={`hidden sm:block text-xs font-medium mb-2 sm:mb-3 ${pkg.popular ? 'text-yellow-500' : 'text-green-500'}`}>
+                      {pkg.savings}
+                    </div>
+                  )}
+
+                  {/* Button */}
+                  <button
+                    onClick={() => handlePurchase(pkg.id)}
+                    className={`w-full py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-colors ${
+                      pkg.popular
+                        ? 'bg-yellow-500 text-black hover:bg-yellow-400'
+                        : pkg.bestValue
+                        ? 'bg-green-500 text-white hover:bg-green-400'
+                        : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    Buy
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Current balance */}
+            <div className={`mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'} text-center`}>
+              <p className={`text-xs sm:text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'} flex flex-wrap items-center justify-center gap-1 sm:gap-2`}>
+                Your credits:
+                <span className="font-bold inline-flex items-center gap-1">
+                  <img src={creditsIcon} alt="credits" className="w-4 h-4" />
+                  {credits.credits}
+                </span>
+                {credits.remaining > 0 && (
+                  <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>+{credits.remaining} free</span>
+                )}
+              </p>
+            </div>
+
+            {/* Note */}
+            <p className={`text-center text-[10px] sm:text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-3`}>
+              Secure payment powered by Stripe
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

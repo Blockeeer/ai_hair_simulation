@@ -263,6 +263,22 @@ const Simulation = () => {
     fetchPackages();
   }, []);
 
+  // Prevent body scroll when pricing modal is open and prevent layout shift
+  useEffect(() => {
+    if (showPricingModal) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    };
+  }, [showPricingModal]);
+
   // Fetch queue status on mount and periodically
   useEffect(() => {
     const fetchQueueStatus = async () => {
@@ -638,41 +654,38 @@ const Simulation = () => {
 
       {/* Credit Packages Modal */}
       {showPricingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className={`relative w-full max-w-4xl my-8 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-2xl shadow-2xl overflow-hidden`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+          <div className={`relative w-full max-w-[95vw] sm:max-w-lg md:max-w-4xl my-4 sm:my-8 ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'} border rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto`}>
             {/* Close button */}
             <button
               onClick={() => setShowPricingModal(false)}
-              className={`absolute top-4 right-4 ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'} transition-colors z-10`}
+              className={`absolute top-2 right-2 sm:top-4 sm:right-4 w-8 h-8 sm:w-auto sm:h-auto flex items-center justify-center rounded-full ${isDark ? 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700' : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200'} transition-colors z-10`}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            <div className="p-6 md:p-8">
+            <div className="p-4 sm:p-6 md:p-8">
               {/* Header */}
-              <div className="text-center mb-8">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-500/20 mb-4">
-                  <img src={creditsIcon} alt="credits" className="w-10 h-10" />
+              <div className="text-center mb-4 sm:mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-yellow-500/20 mb-3">
+                  <img src={creditsIcon} alt="credits" className="w-8 h-8 sm:w-10 sm:h-10" />
                 </div>
-                <h2 className={`text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>
+                <h2 className={`text-xl sm:text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-1`}>
                   Buy Credits
                 </h2>
-                <p className={`${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                   Get more generations with credit packages
-                </p>
-                <p className={`text-sm ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
-                  You get {generationLimit.limit} free generations per account + any credits you purchase
                 </p>
               </div>
 
               {/* Credit Package Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
                 {creditPackages.map((pkg) => (
                   <div
                     key={pkg.id}
-                    className={`relative rounded-xl p-4 md:p-5 border-2 transition-all ${
+                    className={`relative rounded-lg sm:rounded-xl p-2.5 sm:p-4 md:p-5 border-2 transition-all ${
                       pkg.popular
                         ? isDark ? 'border-yellow-500 bg-gray-800' : 'border-yellow-500 bg-yellow-50'
                         : pkg.bestValue
@@ -682,46 +695,46 @@ const Simulation = () => {
                   >
                     {/* Badge */}
                     {pkg.popular && (
-                      <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-yellow-500 text-black text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
                           POPULAR
                         </span>
                       </div>
                     )}
                     {pkg.bestValue && (
-                      <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-green-500 text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 rounded-full whitespace-nowrap">
                           BEST VALUE
                         </span>
                       </div>
                     )}
 
                     {/* Package name */}
-                    <h3 className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-1 ${pkg.popular || pkg.bestValue ? 'mt-1' : ''}`}>
+                    <h3 className={`text-xs sm:text-sm font-semibold ${isDark ? 'text-white' : 'text-gray-900'} mb-0.5 sm:mb-1 ${pkg.popular || pkg.bestValue ? 'mt-1' : ''}`}>
                       {pkg.name}
                     </h3>
 
                     {/* Credits */}
-                    <div className="mb-2 flex items-center gap-1">
-                      <img src={creditsIcon} alt="credits" className="w-5 h-5" />
-                      <span className={`text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <div className="mb-1 sm:mb-2 flex items-center gap-1">
+                      <img src={creditsIcon} alt="credits" className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className={`text-xl sm:text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                         {pkg.credits}
                       </span>
                     </div>
 
                     {/* Price */}
-                    <div className="mb-3">
-                      <span className={`text-lg font-bold ${pkg.popular ? 'text-yellow-500' : pkg.bestValue ? 'text-green-500' : isDark ? 'text-white' : 'text-gray-900'}`}>
+                    <div className="mb-2 sm:mb-3">
+                      <span className={`text-base sm:text-lg font-bold ${pkg.popular ? 'text-yellow-500' : pkg.bestValue ? 'text-green-500' : isDark ? 'text-white' : 'text-gray-900'}`}>
                         ${pkg.price}
                       </span>
-                      <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      <p className={`text-[10px] sm:text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                         ${pkg.pricePerCredit.toFixed(2)}/credit
                       </p>
                     </div>
 
-                    {/* Savings badge */}
+                    {/* Savings badge - hidden on mobile for space */}
                     {pkg.savings && (
-                      <div className={`text-xs font-medium mb-3 ${pkg.popular ? 'text-yellow-500' : 'text-green-500'}`}>
+                      <div className={`hidden sm:block text-xs font-medium mb-2 sm:mb-3 ${pkg.popular ? 'text-yellow-500' : 'text-green-500'}`}>
                         {pkg.savings}
                       </div>
                     )}
@@ -729,7 +742,7 @@ const Simulation = () => {
                     {/* Button */}
                     <button
                       onClick={() => handlePurchase(pkg.id)}
-                      className={`w-full py-2 rounded-lg font-medium text-xs md:text-sm transition-colors ${
+                      className={`w-full py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-colors ${
                         pkg.popular
                           ? 'bg-yellow-500 text-black hover:bg-yellow-400'
                           : pkg.bestValue
@@ -737,28 +750,28 @@ const Simulation = () => {
                           : isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'
                       }`}
                     >
-                      Buy Now
+                      Buy
                     </button>
                   </div>
                 ))}
               </div>
 
               {/* Current balance */}
-              <div className={`mt-6 p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'} text-center`}>
-                <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'} flex items-center justify-center gap-2`}>
-                  Your current balance:
+              <div className={`mt-4 sm:mt-6 p-3 sm:p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'} text-center`}>
+                <p className={`text-xs sm:text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'} flex flex-wrap items-center justify-center gap-1 sm:gap-2`}>
+                  Your credits:
                   <span className="font-bold inline-flex items-center gap-1">
                     <img src={creditsIcon} alt="credits" className="w-4 h-4" />
                     {generationLimit.credits}
                   </span>
                   {generationLimit.remaining > 0 && (
-                    <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>+ {generationLimit.remaining} free remaining</span>
+                    <span className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>+{generationLimit.remaining} free</span>
                   )}
                 </p>
               </div>
 
               {/* Note */}
-              <p className={`text-center text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-4`}>
+              <p className={`text-center text-[10px] sm:text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'} mt-3`}>
                 Secure payment powered by Stripe
               </p>
             </div>
@@ -1299,66 +1312,6 @@ const Simulation = () => {
 
             {/* Divider - Hidden on mobile */}
             <div className={`hidden lg:block h-px ${isDark ? 'bg-gray-800' : 'bg-gray-200'} my-6`}></div>
-
-            {/* Generation Limit Status */}
-            <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'} border rounded-lg p-3 mb-3`}>
-              {/* Credits Badge */}
-              <div className="flex items-center justify-between mb-2">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                  Free Plan
-                </span>
-                {generationLimit.credits > 0 && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${isDark ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-600'}`}>
-                    <img src={creditsIcon} alt="credits" className="w-3 h-3" />
-                    {generationLimit.credits}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Free generations indicator */}
-                <div className={`flex-1 flex items-center gap-2 p-2 rounded-lg ${isDark ? 'bg-gray-700/50' : 'bg-gray-100'}`}>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    generationLimit.remaining > 0
-                      ? isDark ? 'bg-green-900/50' : 'bg-green-100'
-                      : isDark ? 'bg-gray-600' : 'bg-gray-200'
-                  }`}>
-                    <span className={`text-xs font-bold ${
-                      generationLimit.remaining > 0
-                        ? isDark ? 'text-green-400' : 'text-green-600'
-                        : isDark ? 'text-gray-400' : 'text-gray-500'
-                    }`}>
-                      {generationLimit.remaining}
-                    </span>
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>Free</p>
-                    <p className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {generationLimit.generationCount}/{generationLimit.limit} used
-                    </p>
-                  </div>
-                </div>
-                {/* Credits indicator */}
-                <div className={`flex-1 flex items-center gap-2 p-2 rounded-lg ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
-                  <img src={creditsIcon} alt="credits" className="w-6 h-6" />
-                  <div className="flex-1">
-                    <p className={`text-xs font-bold ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}>{generationLimit.credits}</p>
-                    <p className={`text-[10px] ${isDark ? 'text-yellow-500/70' : 'text-yellow-500'}`}>Credits</p>
-                  </div>
-                </div>
-              </div>
-              {/* Buy Credits Button */}
-              <button
-                onClick={() => setShowPricingModal(true)}
-                className={`mt-2 w-full py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                  isDark
-                    ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-black'
-                    : 'bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black'
-                }`}
-              >
-                <img src={creditsIcon} alt="credits" className="w-4 h-4" />
-                Buy Credits
-              </button>
-            </div>
 
             {/* Queue Status Indicator */}
             {queueStatus && queueStatus.activeJobs > 0 && !isGenerating && (
