@@ -65,8 +65,8 @@ const generateSimulation = async (req, res) => {
       }
     }
 
-    // Determine which model to use (default to replicate)
-    const selectedModel = model || 'replicate';
+    // Determine which model to use (default to gemini)
+    const selectedModel = model || 'gemini';
     console.log('Using AI model:', selectedModel);
 
     // Check cache first
@@ -182,8 +182,8 @@ const trialGenerate = async (req, res) => {
     // Convert uploaded image to base64
     const imageBase64 = 'data:' + req.file.mimetype + ';base64,' + req.file.buffer.toString('base64');
 
-    // Determine which model to use (default to replicate)
-    const selectedModel = model || 'replicate';
+    // Determine which model to use (default to gemini)
+    const selectedModel = model || 'gemini';
     console.log('Trial using AI model:', selectedModel);
 
     // Add job to queue

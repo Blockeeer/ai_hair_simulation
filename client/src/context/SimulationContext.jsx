@@ -16,7 +16,7 @@ const defaultState = {
   haircut: 'Random',
   hairColor: 'Random',
   gender: 'male',
-  aiModel: 'replicate',
+  aiModel: 'gemini',
   useCustomHaircut: false,
   useCustomHairColor: false,
   isSaved: false,

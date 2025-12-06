@@ -70,8 +70,8 @@ const Simulation = () => {
 
   // AI Model options
   const aiModelOptions = [
-    { value: 'replicate', label: 'Replicate (Default)', description: 'Fast and reliable' },
-    { value: 'gemini', label: 'Google Gemini', description: 'Advanced AI generation' }
+    { value: 'gemini', label: 'Google Gemini (Default)', description: 'Advanced AI generation' },
+    { value: 'replicate', label: 'Replicate', description: 'Fast and reliable' }
   ];
 
   // Exact options from Replicate API (flux-kontext-apps/change-haircut) - organized by category
@@ -391,7 +391,7 @@ const Simulation = () => {
   };
 
   const handleReset = () => {
-    setAiModel('replicate');
+    setAiModel('gemini');
     setHaircut('Random');
     setHairColor('Random');
     setGender('male');

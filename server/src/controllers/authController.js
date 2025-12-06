@@ -74,10 +74,24 @@ exports.login = async (req, res) => {
 
     const { email, password } = req.body;
 
+    console.log('Login attempt for email:', email);
+
     // Find user
-    const user = await userService.findByEmail(email);
+    let user;
+    try {
+      user = await userService.findByEmail(email);
+      console.log('User lookup result:', user ? 'Found' : 'Not found');
+    } catch (dbError) {
+      console.error('Database error during user lookup:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Database error. Please check Firestore configuration.',
+        error: dbError.message
+      });
+    }
 
     if (!user) {
+      console.log('User not found for email:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
